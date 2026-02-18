@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Simple Client - Full Access Admin Panel</title>
+    <script src="https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js"></script>
+    <style>
+        :root {
+            --bg-dark: #121214; --bg-mid: #1e1e22; --bg-light: #252529;
+            --border: rgba(255,255,255,0.1); --text: #e0e0e0; --muted: #a0a0a0;
+            --primary: #3b82f6; --admin-accent: #f59e0b; --red: #ef4444; --green: #10b981;
+        }
+        body { font-family: 'Inter', sans-serif; background: var(--bg-dark); color: var(--text); margin: 0; display: flex; height: 100vh; }
+        .sidebar { width: 260px; background: var(--bg-mid); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+        .main { flex: 1; display: flex; flex-direction: column; background: var(--bg-dark); }
+        .user-panel { width: 280px; background: var(--bg-mid); border-left: 1px solid var(--border); padding: 15px; }
+        
+        .p-20 { padding: 20px; }
+        h2 { font-size: 16px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 20px; color: var(--muted); }
+        
+        input, button { background: var(--bg-light); border: 1px solid var(--border); color: white; padding: 10px; border-radius: 6px; width: 100%; box-sizing: border-box; margin-bottom: 10px; outline: none; }
+        button { cursor: pointer; font-weight: bold; transition: 0.2s; }
+        button:hover { background: var(--primary); }
+        
+        #chat-flow { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 10px; }
+        .msg { background: var(--bg-mid); padding: 10px; border-radius: 8px; border: 1px solid var(--border); max-width: 80%; }
+        .msg.me { align-self: flex-end; border-color: var(--primary); background: rgba(59, 130, 246, 0.1); }
+        .msg.admin { border-color: var(--admin-accent); background: rgba(245, 158, 11, 0.1); }
+        .msg .header { font-size: 11px; color: var(--muted); margin-bottom: 5px; display: flex; justify-content: space-between; }
+        .msg .name { font-weight: bold; color: var(--primary); }
+        .msg.admin .name { color: var(--admin-accent); }
+        .msg .body { font-size: 14px; word-break: break-all; }
+
+        .input-area { padding: 20px; background: var(--bg-mid); border-top: 1px solid var(--border); display: flex; gap: 10px; }
+        #msg-input { flex: 1; margin-bottom: 0; }
+        .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
+        .online { background: var(--green); } .offline { background: var(--red); }
+        
+        ul { list-style: none; padding: 0; }
+        li { padding: 8px; border-radius: 4px; margin-bottom: 5px; cursor: pointer; font-size: 13px; }
+        li:hover { background: var(--bg-light); }
+        li.selected { border: 1px solid var(--primary); background: rgba(59,130,246,0.1); }
+    </style>
+</head>
+<body>
+    <!-- 左サイドバー: 接続設定 -->
+    <div class="sidebar p-20">
+        <h2>Connection</h2>
+        <input type="text" id="topic-input" placeholder="Topic: tm_chat_v12_...">
+        <button id="connect-btn" style="background: var(--primary);">CONNECT</button>
+        <button id="disconnect-btn" style="background: var(--red); display:none;">DISCONNECT</button>
+        <div id="conn-status" style="font-size: 12px; margin-top: 10px;"><span class="status-dot offline"></span>Disconnected</div>
+        
+        <div style="margin-top: 40px;">
+            <h2>Crypto Status</h2>
+            <div id="crypto-status" style="font-size: 12px; color: var(--muted);">Waiting for AES Key...</div>
+        </div>
+    </div>
+
+    <!-- メイン: チャット画面 -->
+    <div class="main">
+        <div id="chat-flow"></div>
+        <div class="input-area">
+            <input type="text" id="msg-input" placeholder="Message as Admin..." disabled>
+            <button id="send-btn" style="width: 80px;" disabled>SEND</button>
+        </div>
+    </div>
+
+    <!-- 右パネル: ユーザー & 管理 -->
+    <div class="user-panel">
+        <h2>Online Users (<span id="user-count">0</span>)</h2>
+        <ul id="user-list"></ul>
+        
+        <div id="mod-controls" style="display: none; margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--border);">
+            <h2 style="color: var(--red);">Moderate</h2>
+            <div id="target-name" style="margin-bottom: 10px; font-weight: bold;"></div>
+            <button id="kick-btn" style="background: var(--admin-accent); color: black;">KICK (Timeout)</button>
+            <button id="ban-btn" style="background: var(--red);">BAN USER</button>
+        </div>
+    </div>
+
+    <script>
+        // --- Crypto Module (Simple Clientと完全互換) ---
+        const ChatCrypto = {
+            rsaKeys: null, aesKey: null,
+            async generateRsa() {
+                this.rsaKeys = await crypto.subtle.generateKey(
+                    { name: 'RSA-OAEP', modulusLength: 2048, publicExponent: new Uint8Array([1,0,1]), hash: 'SHA-256' },
+                    true, ['encrypt', 'decrypt']
+                );
+            },
+            async exportPub() { return JSON.stringify(await crypto.subtle.exportKey('jwk', this.rsaKeys.publicKey)); },
+            async importKey(jwk, type, usage) { return await crypto.subtle.importKey('jwk', JSON.parse(jwk), { name: type, hash: 'SHA-256' }, true, usage); },
+            async decryptRsa(b64) {
+                try {
+                    const data = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+                    const dec = await crypto.subtle.decrypt({ name: 'RSA-OAEP' }, this.rsaKeys.privateKey, data);
+                    return new TextDecoder().decode(dec);
+                } catch { return null; }
+            },
+            async encryptAes(text) {
+                if (!this.aesKey) return null;
+                const iv = crypto.getRandomValues(new Uint8Array(12));
+                const enc = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, this.aesKey, new TextEncoder().encode(text));
+                return btoa(String.fromCharCode.apply(null, iv)) + '.' + btoa(String.fromCharCode.apply(null, new Uint8Array(enc)));
+            },
+            async decryptAes(b64) {
+                if (!this.aesKey) return null;
+                try {
+                    const [iv_b64, data_b64] = b64.split('.');
+                    const iv = Uint8Array.from(atob(iv_b64), c => c.charCodeAt(0));
+                    const data = Uint8Array.from(atob(data_b64), c => c.charCodeAt(0));
+                    const dec = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, this.aesKey, data);
+                    return new TextDecoder().decode(dec);
+                } catch { return null; }
+            }
+        };
+
+        // --- 管理者パネルの状態 ---
+        let client = null;
+        let adminId = 'admin-' + Math.random().toString(36).substr(2, 4);
+        let currentTopic = '';
+        let onlineUsers = new Map();
+        let selectedUser = null;
+
+        const topicIn = document.getElementById('topic-input');
+        const connStatus = document.getElementById('conn-status');
+        const cryptoStatus = document.getElementById('crypto-status');
+        const chatFlow = document.getElementById('chat-flow');
+        const msgIn = document.getElementById('msg-input');
+        const sendBtn = document.getElementById('send-btn');
+
+        // 接続処理
+        document.getElementById('connect-btn').onclick = async () => {
+            currentTopic = topicIn.value.trim();
+            if(!currentTopic) return alert('Enter topic!');
+
+            await ChatCrypto.generateRsa();
+            client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
+
+            client.on('connect', async () => {
+                connStatus.innerHTML = '<span class="status-dot online"></span>Connected';
+                document.getElementById('connect-btn').style.display = 'none';
+                document.getElementById('disconnect-btn').style.display = 'block';
+                msgIn.disabled = false; sendBtn.disabled = false;
+
+                client.subscribe(currentTopic);
+                // 参加通知を出し、共有鍵（AES）を要求する
+                client.publish(currentTopic, JSON.stringify({
+                    type: 'join', id: adminId, name: '🛡️ ADMIN', key: await ChatCrypto.exportPub()
+                }));
+            });
+
+            client.on('message', async (topic, message) => {
+                const data = JSON.parse(message.toString());
+                const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+                switch(data.type) {
+                    case 'join':
+                    case 'ack':
+                        onlineUsers.set(data.id, data.name);
+                        renderUsers();
+                        break;
+                    case 'leave':
+                        onlineUsers.delete(data.id);
+                        renderUsers();
+                        break;
+                    case 'aes_key':
+                        const jwk = await ChatCrypto.decryptRsa(data.key);
+                        if (jwk) {
+                            ChatCrypto.aesKey = await ChatCrypto.importKey(jwk, 'AES-GCM', ['encrypt', 'decrypt']);
+                            cryptoStatus.innerHTML = '✅ AES Key Decrypted. Content Visible.';
+                            cryptoStatus.style.color = 'var(--green)';
+                        }
+                        break;
+                    case 'msg':
+                        let text = '暗号化されています...';
+                        if (ChatCrypto.aesKey) {
+                            text = await ChatCrypto.decryptAes(data.payload) || '[復号失敗]';
+                        }
+                        addMessage(data.name, text, data.id === adminId, false);
+                        break;
+                    case 'admin_msg': // 管理者メッセージ
+                        addMessage(data.name, data.text, data.id === adminId, true);
+                        break;
+                }
+            });
+        };
+
+        function addMessage(name, text, isMe, isAdmin) {
+            const div = document.createElement('div');
+            div.className = `msg ${isMe ? 'me' : ''} ${isAdmin ? 'admin' : ''}`;
+            div.innerHTML = `
+                <div class="header">
+                    <span class="name">${name}</span>
+                    <span>${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                </div>
+                <div class="body">${text}</div>
+            `;
+            chatFlow.appendChild(div);
+            chatFlow.scrollTop = chatFlow.scrollHeight;
+        }
+
+        async function doSend() {
+            const text = msgIn.value.trim();
+            if (!text || !ChatCrypto.aesKey) return;
+
+            // 管理者として通常の暗号化チャットに送信
+            const encrypted = await ChatCrypto.encryptAes(text);
+            client.publish(currentTopic, JSON.stringify({
+                type: 'msg', id: adminId, name: '🛡️ ADMIN', payload: encrypted
+            }));
+            msgIn.value = '';
+        }
+
+        sendBtn.onclick = doSend;
+        msgIn.onkeydown = (e) => { if(e.key === 'Enter') doSend(); };
+
+        function renderUsers() {
+            const list = document.getElementById('user-list');
+            list.innerHTML = '';
+            onlineUsers.forEach((name, id) => {
+                const li = document.createElement('li');
+                li.textContent = `${name} (${id.substr(0,6)})`;
+                if(selectedUser === id) li.className = 'selected';
+                li.onclick = () => {
+                    selectedUser = id;
+                    document.getElementById('mod-controls').style.display = 'block';
+                    document.getElementById('target-name').textContent = name;
+                    renderUsers();
+                };
+                list.appendChild(li);
+            });
+            document.getElementById('user-count').textContent = onlineUsers.size;
+        }
+
+        // KICK / BAN ボタンの処理
+        document.getElementById('kick-btn').onclick = () => {
+            if(!selectedUser) return;
+            client.publish(currentTopic, JSON.stringify({ type: 'admin_timeout', targetId: selectedUser }));
+            alert('Kicked ' + onlineUsers.get(selectedUser));
+        };
+
+        document.getElementById('ban-btn').onclick = () => {
+            if(!selectedUser) return;
+            if(confirm('本当にBANしますか？')) {
+                client.publish(currentTopic, JSON.stringify({ type: 'admin_ban', targetId: selectedUser }));
+            }
+        };
+
+        document.getElementById('disconnect-btn').onclick = () => location.reload();
+
+    </script>
+</body>
+</html>
