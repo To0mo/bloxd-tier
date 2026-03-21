@@ -16,6 +16,7 @@
             --text-main: #f8fafc;
             --text-muted: #64748b;
             --accent: #3b82f6;
+            --danger: #ef4444;
             --tier-ht: #f59e0b;
             --tier-lt: #8b5cf6;
         }
@@ -60,18 +61,21 @@
 
         .rank { font-weight: 700; color: var(--text-muted); font-size: 15px; }
         
-        .name-wrapper { display: flex; align-items: center; gap: 8px; overflow: hidden; }
+        .name-wrapper { display: flex; align-items: center; gap: 4px; overflow: hidden; }
         .name { 
             font-weight: 700; font-size: 16px; white-space: nowrap; 
-            overflow: hidden; text-overflow: ellipsis; 
+            overflow: hidden; text-overflow: ellipsis; margin-right: 4px;
         }
-        .edit-name-btn {
+        
+        /* アクションボタン (編集・削除) */
+        .action-btn {
             background: none; border: none; fill: var(--text-muted); cursor: pointer;
-            padding: 4px; border-radius: 4px; display: none;
+            padding: 4px; border-radius: 4px; display: none; align-items: center; justify-content: center;
         }
-        .is-me .edit-name-btn { display: flex; align-items: center; justify-content: center; }
-        .is-me .edit-name-btn:hover { fill: var(--accent); background: rgba(59, 130, 246, 0.1); }
-        .edit-name-btn svg { width: 14px; height: 14px; }
+        .is-me .action-btn { display: flex; }
+        .action-btn:hover { background: rgba(255, 255, 255, 0.1); fill: var(--text-main); }
+        .action-btn.del:hover { background: rgba(239, 68, 68, 0.2); fill: var(--danger); }
+        .action-btn svg { width: 14px; height: 14px; }
 
         /* --- Icons --- */
         .tier-cell { display: flex; flex-direction: column; align-items: center; gap: 6px; }
@@ -79,17 +83,18 @@
             width: 40px; height: 40px; background: #1a1d27; border: 1px solid var(--border);
             border-radius: 8px; display: flex; align-items: center; justify-content: center;
         }
-        /* アイコンの色をグレーに統一 */
+        
+        /* 剣とスパイクをグレー単色で統一 */
         .icon svg { width: 22px; height: 22px; fill: var(--text-muted); transition: fill 0.2s; }
         
         .is-me .icon { cursor: pointer; border-color: #334155; }
         .is-me .icon:hover { border-color: var(--accent); background: #1e293b; }
-        /* ホバー時は明るい白に変更 */
         .is-me .icon:hover svg { fill: var(--text-main); }
 
         .tier-text { font-size: 10px; font-weight: 900; text-align: center; line-height: 1.2; }
         .t-HT { color: var(--tier-ht); }
         .t-LT { color: var(--tier-lt); }
+        .t-Un { color: var(--text-muted); } /* Unranked color */
 
         /* --- Modals --- */
         .modal {
@@ -107,7 +112,7 @@
             width: 100%; padding: 14px; background: var(--bg); border: 1px solid var(--border);
             color: white; border-radius: 8px; font-size: 16px; margin-bottom: 10px; font-family: inherit; font-weight: 600;
         }
-        .error-msg { color: #ef4444; font-size: 12px; margin-bottom: 15px; height: 14px; font-weight: 600;}
+        .error-msg { color: var(--danger); font-size: 12px; margin-bottom: 15px; height: 14px; font-weight: 600;}
         
         .btn {
             width: 100%; padding: 14px; background: var(--accent); color: white;
@@ -122,6 +127,8 @@
             padding: 14px 10px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer;
         }
         .t-btn:hover { border-color: var(--accent); color: var(--accent); background: #1e293b; }
+        .t-btn.full-width { grid-column: 1 / -1; background: #232736; border-color: #334155; color: var(--text-muted); }
+        .t-btn.full-width:hover { border-color: var(--text-main); color: var(--text-main); }
 
         @media (max-width: 480px) {
             .table-header, .row { grid-template-columns: 30px 1fr 75px 75px; padding: 10px; gap: 4px; }
@@ -136,7 +143,6 @@
     <div class="container">
         <header class="header">
             <h1>RANKINGS</h1>
-            <!-- 文字を消し、緑のドットだけ残す -->
             <div class="live-sync" title="Connected">
                 <div class="dot"></div>
             </div>
@@ -176,15 +182,17 @@
     <script>
         const app = {
             brokerUrl: 'wss://public:public@public.cloud.shiftr.io',
-            topic: 'bloxd/official/tiers_v4',
+            topic: 'bloxd/official/tiers_v5', // トピック名を変更して古いデータをリセット
             
             icons: {
-                // 普通の交差する剣 (滑らかなパス)
-                sfc: `<svg viewBox="0 0 24 24"><path d="M19.7,4.3c-0.4-0.4-1-0.4-1.4,0L12,10.6L5.7,4.3c-0.4-0.4-1-0.4-1.4,0s-0.4,1,0,1.4l6.3,6.3l-6.3,6.3c-0.4,0.4-0.4,1,0,1.4C4.5,19.9,4.7,20,5,20s0.5-0.1,0.7-0.3l6.3-6.3l6.3,6.3c0.2,0.2,0.5,0.3,0.7,0.3s0.5-0.1,0.7-0.3c0.4-0.4,0.4-1,0-1.4L13.4,12l6.3-6.3C20.1,5.3,20.1,4.7,19.7,4.3z"/></svg>`,
-                // 3つの滑らかな上向きスパイク
-                ugd: `<svg viewBox="0 0 24 24"><path d="M12,2L9,12H5L2,22h5l2-7h6l2,7h5L19,12h-4L12,2z"/></svg>`,
-                // 編集用の鉛筆アイコン
-                edit: `<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>`
+                // 剣の交差 (絵文字 ⚔️ のような形状)
+                sfc: `<svg viewBox="0 0 24 24"><path d="M14.1,9.5L13,8.4L5.6,15.8C5.2,16.2 5.2,16.9 5.6,17.3L6.7,18.4C7.1,18.8 7.8,18.8 8.2,18.4L15.6,11L14.5,9.9V9.5 M21,3L18.8,5.2L15.3,1.7L13.9,3.1L17.4,6.6L12.4,11.6L14.5,13.7L19.5,8.7L23,12.2L24.4,10.8L20.9,7.3L23.1,5.1L21,3 M3,21L5.2,18.8L1.7,15.3L3.1,13.9L6.6,17.4L11.6,12.4L13.7,14.5L8.7,19.5L12.2,23L10.8,24.4L7.3,20.9L5.1,23.1L3,21Z"/></svg>`,
+                // スパイク (ピクセル感を残しつつ、色はグレー単色)
+                ugd: `<svg viewBox="0 0 24 24" shape-rendering="crispEdges"><path d="M5 20h4v-9H5z M11 20h4V5h-4z M17 20h4v-7h-4z"/></svg>`,
+                // 鉛筆アイコン
+                edit: `<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>`,
+                // ゴミ箱アイコン
+                trash: `<svg viewBox="0 0 24 24"><path d="M9 3v1H4v2h1v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6h1V4h-5V3H9m0 5h2v9H9V8m4 0h2v9h-2V8z"/></svg>`
             },
 
             tiers: ["HT2", "HT3", "HT4", "HT5", "LT1", "LT2", "LT3", "LT4", "LT5"],
@@ -198,20 +206,20 @@
 
             init: function() {
                 this.buildTierButtons();
-                this.myId = localStorage.getItem('bx_uid_v4');
-                const myName = localStorage.getItem('bx_name_v4');
+                this.myId = localStorage.getItem('bx_uid_v5');
+                const myName = localStorage.getItem('bx_name_v5');
 
                 this.connectMQTT();
 
                 if (!this.myId || !myName) {
                     this.openNameModal(false);
                 } else {
-                    this.players[this.myId] = { id: this.myId, name: myName, sfc: 'LT5 Low', ugd: 'LT5 Low' };
-                    const savedTiers = localStorage.getItem('bx_tiers_v4');
+                    this.players[this.myId] = { id: this.myId, name: myName, sfc: 'Unranked', ugd: 'Unranked' };
+                    const savedTiers = localStorage.getItem('bx_tiers_v5');
                     if (savedTiers) {
                         const t = JSON.parse(savedTiers);
-                        this.players[this.myId].sfc = t.sfc || 'LT5 Low';
-                        this.players[this.myId].ugd = t.ugd || 'LT5 Low';
+                        this.players[this.myId].sfc = t.sfc || 'Unranked';
+                        this.players[this.myId].ugd = t.ugd || 'Unranked';
                     }
                     this.renderList();
                 }
@@ -221,7 +229,7 @@
                 this.isChangingName = isChange;
                 document.getElementById('name-modal-title').innerText = isChange ? 'CHANGE NAME' : 'ENTER NAME';
                 document.getElementById('btn-submit-name').innerText = isChange ? 'UPDATE' : 'JOIN';
-                document.getElementById('username').value = isChange ? localStorage.getItem('bx_name_v4') : '';
+                document.getElementById('username').value = isChange ? localStorage.getItem('bx_name_v5') : '';
                 document.getElementById('name-error').innerText = '';
                 document.getElementById('modal-name').style.display = 'flex';
             },
@@ -248,17 +256,39 @@
                 
                 if (!this.myId) {
                     this.myId = 'u_' + Math.random().toString(36).substr(2, 9);
-                    localStorage.setItem('bx_uid_v4', this.myId);
-                    this.players[this.myId] = { id: this.myId, name: nameInput, sfc: 'LT5 Low', ugd: 'LT5 Low' };
+                    localStorage.setItem('bx_uid_v5', this.myId);
+                    this.players[this.myId] = { id: this.myId, name: nameInput, sfc: 'Unranked', ugd: 'Unranked' };
                 } else {
                     this.players[this.myId].name = nameInput;
                 }
 
-                localStorage.setItem('bx_name_v4', nameInput);
+                localStorage.setItem('bx_name_v5', nameInput);
                 document.getElementById('modal-name').style.display = 'none';
                 
                 this.renderList();
                 this.publishMyData();
+            },
+
+            // 自己削除機能
+            deleteMe: function() {
+                if (confirm("Are you sure you want to delete your profile from the rankings?")) {
+                    // 他のクライアントにも削除を通知
+                    if (this.client && this.client.connected) {
+                        this.client.publish(this.topic, JSON.stringify({ type: 'delete', id: this.myId }));
+                    }
+                    
+                    // ローカルデータを消去
+                    delete this.players[this.myId];
+                    localStorage.removeItem('bx_uid_v5');
+                    localStorage.removeItem('bx_name_v5');
+                    localStorage.removeItem('bx_tiers_v5');
+                    
+                    this.myId = null;
+                    this.renderList();
+                    
+                    // 最初からやり直すために登録画面を出す
+                    this.openNameModal(false);
+                }
             },
 
             renderList: function() {
@@ -279,7 +309,10 @@
                             <div class="rank">${i + 1}</div>
                             <div class="name-wrapper">
                                 <div class="name">${p.name}</div>
-                                ${isMe ? `<button class="edit-name-btn" onclick="app.openNameModal(true)" title="Change Name">${this.icons.edit}</button>` : ''}
+                                ${isMe ? `
+                                    <button class="action-btn" onclick="app.openNameModal(true)" title="Change Name">${this.icons.edit}</button>
+                                    <button class="action-btn del" onclick="app.deleteMe()" title="Delete Profile">${this.icons.trash}</button>
+                                ` : ''}
                             </div>
                             <div class="tier-cell">
                                 <div class="icon" ${isMe ? `onclick="app.openEdit('sfc')"` : ''}>${this.icons.sfc}</div>
@@ -296,6 +329,15 @@
 
             buildTierButtons: function() {
                 const div = document.getElementById('tier-btns');
+                
+                // Unrankedボタン
+                const unBtn = document.createElement('button');
+                unBtn.className = 't-btn full-width';
+                unBtn.innerText = 'Unranked';
+                unBtn.onclick = function() { app.setTier('Unranked'); };
+                div.appendChild(unBtn);
+
+                // HT, LT ボタン
                 for (let i = 0; i < this.tiers.length; i++) {
                     for (let j = 0; j < this.subTiers.length; j++) {
                         const tierStr = this.tiers[i] + ' ' + this.subTiers[j];
@@ -316,7 +358,7 @@
 
             setTier: function(tierStr) {
                 this.players[this.myId][this.editingCat] = tierStr;
-                localStorage.setItem('bx_tiers_v4', JSON.stringify({
+                localStorage.setItem('bx_tiers_v5', JSON.stringify({
                     sfc: this.players[this.myId].sfc,
                     ugd: this.players[this.myId].ugd
                 }));
@@ -340,13 +382,22 @@
                 this.client.on('message', (topic, message) => {
                     try {
                         const data = JSON.parse(message.toString());
-                        const remotePlayer = data.p;
+                        
+                        // 誰かが自分を削除した時の処理
+                        if (data.type === 'delete' && data.id) {
+                            delete this.players[data.id];
+                            this.renderList();
+                            return;
+                        }
 
+                        // 更新・追加の処理
+                        const remotePlayer = data.p;
                         if (remotePlayer && remotePlayer.id) {
                             this.players[remotePlayer.id] = remotePlayer;
                             this.renderList();
 
-                            if (data.type === 'sync_req' && remotePlayer.id !== this.myId) {
+                            // 同期リクエストがあれば返信する
+                            if (data.type === 'sync_req' && remotePlayer.id !== this.myId && this.myId && this.players[this.myId]) {
                                 this.publishMyData();
                             }
                         }
