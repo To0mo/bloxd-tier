@@ -19,6 +19,7 @@
             --danger: #ef4444;
             --tier-ht: #f59e0b;
             --tier-lt: #8b5cf6;
+            --admin-color: #10b981;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -28,9 +29,10 @@
             background-color: var(--bg);
             color: var(--text-main);
             padding: 20px 10px;
+            padding-bottom: 60px; /* Adminリンク用の余白 */
         }
 
-        .container { max-width: 800px; margin: 0 auto; }
+        .container { max-width: 800px; margin: 0 auto; position: relative; min-height: 90vh; }
 
         /* --- Header --- */
         .header {
@@ -38,6 +40,10 @@
             margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border);
         }
         .header h1 { font-size: 24px; font-weight: 900; letter-spacing: -1px; margin: 0; }
+        .header h1 span.admin-badge {
+            font-size: 10px; background: var(--admin-color); color: #fff;
+            padding: 2px 6px; border-radius: 4px; vertical-align: middle; margin-left: 8px; display: none;
+        }
         .live-sync { display: flex; align-items: center; }
         .dot {
             width: 8px; height: 8px; border-radius: 50%;
@@ -58,6 +64,8 @@
             border-radius: 12px; padding: 12px 16px; transition: border-color 0.2s;
         }
         .row.is-me { border-color: var(--accent); background: #171b28; }
+        /* Adminモード時の他人の行のホバー効果 */
+        .admin-mode .row:not(.is-me):hover { border-color: var(--admin-color); }
 
         .rank { font-weight: 700; color: var(--text-muted); font-size: 15px; }
         
@@ -73,6 +81,9 @@
             padding: 4px; border-radius: 4px; display: none; align-items: center; justify-content: center;
         }
         .is-me .action-btn { display: flex; }
+        /* Adminモード時は全員の削除ボタンを表示 */
+        .admin-mode .action-btn.del { display: flex; }
+
         .action-btn:hover { background: rgba(255, 255, 255, 0.1); fill: var(--text-main); }
         .action-btn.del:hover { background: rgba(239, 68, 68, 0.2); fill: var(--danger); }
         .action-btn svg { width: 14px; height: 14px; }
@@ -84,17 +95,30 @@
             border-radius: 8px; display: flex; align-items: center; justify-content: center;
         }
         
-        /* 剣とスパイクをグレー単色で統一 */
         .icon svg { width: 22px; height: 22px; fill: var(--text-muted); transition: fill 0.2s; }
         
         .is-me .icon { cursor: pointer; border-color: #334155; }
         .is-me .icon:hover { border-color: var(--accent); background: #1e293b; }
         .is-me .icon:hover svg { fill: var(--text-main); }
 
+        /* Adminモード時は全員のアイコンを編集可能にする */
+        .admin-mode .icon { cursor: pointer; border-color: #334155; }
+        .admin-mode .icon:hover { border-color: var(--admin-color); background: #13241e; }
+        .admin-mode .icon:hover svg { fill: var(--admin-color); }
+
         .tier-text { font-size: 10px; font-weight: 900; text-align: center; line-height: 1.2; }
         .t-HT { color: var(--tier-ht); }
         .t-LT { color: var(--tier-lt); }
-        .t-Un { color: var(--text-muted); } /* Unranked color */
+        .t-Un { color: var(--text-muted); }
+
+        /* --- Admin Footer --- */
+        .admin-footer {
+            position: absolute; bottom: -40px; left: 0; width: 100%; text-align: center;
+        }
+        .admin-link {
+            font-size: 10px; color: #334155; text-decoration: none; cursor: pointer; transition: color 0.2s;
+        }
+        .admin-link:hover { color: var(--text-muted); }
 
         /* --- Modals --- */
         .modal {
@@ -118,6 +142,7 @@
             width: 100%; padding: 14px; background: var(--accent); color: white;
             border: none; border-radius: 8px; font-weight: 700; font-size: 15px; cursor: pointer;
         }
+        .btn.admin-btn { background: var(--admin-color); }
 
         .tier-grid {
             display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-height: 50vh; overflow-y: auto;
@@ -140,9 +165,9 @@
 </head>
 <body>
 
-    <div class="container">
+    <div class="container" id="main-container">
         <header class="header">
-            <h1>RANKINGS</h1>
+            <h1>RANKINGS<span class="admin-badge" id="admin-badge">ADMIN</span></h1>
             <div class="live-sync" title="Connected">
                 <div class="dot"></div>
             </div>
@@ -157,6 +182,11 @@
 
         <div id="list" class="list">
             <!-- プレイヤーリスト -->
+        </div>
+
+        <!-- 開発者窓口 -->
+        <div class="admin-footer">
+            <span class="admin-link" onclick="app.openAdminLogin()">Admin Access</span>
         </div>
     </div>
 
@@ -175,39 +205,62 @@
     <div id="modal-edit" class="modal">
         <div class="modal-content">
             <h2 id="edit-title">SELECT TIER</h2>
+            <p class="desc" id="edit-target-name"></p>
             <div id="tier-btns" class="tier-grid"></div>
+        </div>
+    </div>
+
+    <!-- Adminログインモーダル -->
+    <div id="modal-admin" class="modal">
+        <div class="modal-content">
+            <h2>DEVELOPER ACCESS</h2>
+            <input type="password" id="admin-pwd" placeholder="Password">
+            <div id="admin-error" class="error-msg"></div>
+            <button class="btn admin-btn" onclick="app.loginAdmin()">LOGIN</button>
         </div>
     </div>
 
     <script>
         const app = {
             brokerUrl: 'wss://public:public@public.cloud.shiftr.io',
-            topic: 'bloxd/official/tiers_v5', // トピック名を変更して古いデータをリセット
+            topic: 'bloxd/official/tiers_v6',
             
             icons: {
-                // 剣の交差 (絵文字 ⚔️ のような形状)
-                sfc: `<svg viewBox="0 0 24 24"><path d="M14.1,9.5L13,8.4L5.6,15.8C5.2,16.2 5.2,16.9 5.6,17.3L6.7,18.4C7.1,18.8 7.8,18.8 8.2,18.4L15.6,11L14.5,9.9V9.5 M21,3L18.8,5.2L15.3,1.7L13.9,3.1L17.4,6.6L12.4,11.6L14.5,13.7L19.5,8.7L23,12.2L24.4,10.8L20.9,7.3L23.1,5.1L21,3 M3,21L5.2,18.8L1.7,15.3L3.1,13.9L6.6,17.4L11.6,12.4L13.7,14.5L8.7,19.5L12.2,23L10.8,24.4L7.3,20.9L5.1,23.1L3,21Z"/></svg>`,
-                // スパイク (ピクセル感を残しつつ、色はグレー単色)
+                // 修正版：明確な交差する剣 (Material Design)
+                sfc: `<svg viewBox="0 0 24 24"><path d="M19.06,3.58L17.64,2.17C17.38,1.9 16.96,1.9 16.7,2.17L15,3.87L11.55,0.42C11.36,0.22 11.05,0.22 10.85,0.42L8.73,2.54C8.54,2.73 8.54,3.05 8.73,3.24L12.18,6.69L10.5,8.38L8.38,6.26L5.55,9.09L7.67,11.21L2.09,16.79C1.84,17.04 1.84,17.46 2.09,17.71L3.5,19.12L4.91,20.54C5.17,20.79 5.59,20.79 5.84,20.54L11.42,14.96L13.54,17.08L16.36,14.25L14.24,12.13L15.93,10.45L19.38,13.89C19.58,14.09 19.89,14.09 20.09,13.89L22.21,11.77C22.4,11.58 22.4,11.26 22.21,11.07L18.76,7.62L20.46,5.93C20.73,5.67 20.73,5.25 20.46,5M17.88,4.76L18.94,5.82L17.53,7.23L16.47,6.17L17.88,4.76M5.41,18.06L4.35,17L5.76,15.59L6.82,16.65L5.41,18.06Z"/></svg>`,
+                // グレー単色のスパイク
                 ugd: `<svg viewBox="0 0 24 24" shape-rendering="crispEdges"><path d="M5 20h4v-9H5z M11 20h4V5h-4z M17 20h4v-7h-4z"/></svg>`,
-                // 鉛筆アイコン
                 edit: `<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>`,
-                // ゴミ箱アイコン
                 trash: `<svg viewBox="0 0 24 24"><path d="M9 3v1H4v2h1v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6h1V4h-5V3H9m0 5h2v9H9V8m4 0h2v9h-2V8z"/></svg>`
             },
 
             tiers: ["HT2", "HT3", "HT4", "HT5", "LT1", "LT2", "LT3", "LT4", "LT5"],
             subTiers: ["High", "Mid High", "Mid", "Mid Low", "Low"],
 
+            // Tier計算用スコア定義
+            tierWeights: {
+                "HT2": 1000, "HT3": 900, "HT4": 800, "HT5": 700,
+                "LT1": 600, "LT2": 500, "LT3": 400, "LT4": 300, "LT5": 200, "Unranked": 0
+            },
+            subTierWeights: {
+                "High": 50, "Mid High": 40, "Mid": 30, "Mid Low": 20, "Low": 10, "Unranked": 0
+            },
+
             players: {},
             myId: null,
             client: null,
             editingCat: '',
+            editingUserId: null, // Admin用: 誰のTierを編集しているか
             isChangingName: false,
+            isAdmin: false, // 管理者モードフラグ
+
+            // 'admin'のSHA-256ハッシュ (コードを見られてもパスワードはバレない)
+            ADMIN_HASH: "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918",
 
             init: function() {
                 this.buildTierButtons();
-                this.myId = localStorage.getItem('bx_uid_v5');
-                const myName = localStorage.getItem('bx_name_v5');
+                this.myId = localStorage.getItem('bx_uid_v6');
+                const myName = localStorage.getItem('bx_name_v6');
 
                 this.connectMQTT();
 
@@ -215,7 +268,7 @@
                     this.openNameModal(false);
                 } else {
                     this.players[this.myId] = { id: this.myId, name: myName, sfc: 'Unranked', ugd: 'Unranked' };
-                    const savedTiers = localStorage.getItem('bx_tiers_v5');
+                    const savedTiers = localStorage.getItem('bx_tiers_v6');
                     if (savedTiers) {
                         const t = JSON.parse(savedTiers);
                         this.players[this.myId].sfc = t.sfc || 'Unranked';
@@ -225,11 +278,43 @@
                 }
             },
 
+            // SHA-256 ハッシュ生成関数
+            hashString: async function(message) {
+                const msgBuffer = new TextEncoder().encode(message);
+                const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+                const hashArray = Array.from(new Uint8Array(hashBuffer));
+                return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            },
+
+            // --- Admin 機能 ---
+            openAdminLogin: function() {
+                if(this.isAdmin) return; // 既にログイン済み
+                document.getElementById('admin-error').innerText = '';
+                document.getElementById('admin-pwd').value = '';
+                document.getElementById('modal-admin').style.display = 'flex';
+            },
+
+            loginAdmin: async function() {
+                const pwd = document.getElementById('admin-pwd').value;
+                const hash = await this.hashString(pwd);
+                
+                if (hash === this.ADMIN_HASH) {
+                    this.isAdmin = true;
+                    document.getElementById('modal-admin').style.display = 'none';
+                    document.getElementById('main-container').classList.add('admin-mode');
+                    document.getElementById('admin-badge').style.display = 'inline-block';
+                    this.renderList(); // UIをAdmin用に再描画
+                } else {
+                    document.getElementById('admin-error').innerText = 'Access Denied: Invalid Password';
+                }
+            },
+
+            // --- 名前登録 ---
             openNameModal: function(isChange) {
                 this.isChangingName = isChange;
                 document.getElementById('name-modal-title').innerText = isChange ? 'CHANGE NAME' : 'ENTER NAME';
                 document.getElementById('btn-submit-name').innerText = isChange ? 'UPDATE' : 'JOIN';
-                document.getElementById('username').value = isChange ? localStorage.getItem('bx_name_v5') : '';
+                document.getElementById('username').value = isChange ? localStorage.getItem('bx_name_v6') : '';
                 document.getElementById('name-error').innerText = '';
                 document.getElementById('modal-name').style.display = 'flex';
             },
@@ -256,47 +341,69 @@
                 
                 if (!this.myId) {
                     this.myId = 'u_' + Math.random().toString(36).substr(2, 9);
-                    localStorage.setItem('bx_uid_v5', this.myId);
+                    localStorage.setItem('bx_uid_v6', this.myId);
                     this.players[this.myId] = { id: this.myId, name: nameInput, sfc: 'Unranked', ugd: 'Unranked' };
                 } else {
                     this.players[this.myId].name = nameInput;
                 }
 
-                localStorage.setItem('bx_name_v5', nameInput);
+                localStorage.setItem('bx_name_v6', nameInput);
                 document.getElementById('modal-name').style.display = 'none';
                 
                 this.renderList();
-                this.publishMyData();
+                this.publishData(this.myId);
             },
 
-            // 自己削除機能
-            deleteMe: function() {
-                if (confirm("Are you sure you want to delete your profile from the rankings?")) {
-                    // 他のクライアントにも削除を通知
+            // --- 削除機能 ---
+            deletePlayer: function(targetId) {
+                const isMe = (targetId === this.myId);
+                const msg = isMe ? "Are you sure you want to delete your profile?" : `Are you sure you want to delete ${this.players[targetId].name}?`;
+                
+                if (confirm(msg)) {
+                    // 全体に削除を通知
                     if (this.client && this.client.connected) {
-                        this.client.publish(this.topic, JSON.stringify({ type: 'delete', id: this.myId }));
+                        this.client.publish(this.topic, JSON.stringify({ type: 'delete', id: targetId }));
                     }
                     
-                    // ローカルデータを消去
-                    delete this.players[this.myId];
-                    localStorage.removeItem('bx_uid_v5');
-                    localStorage.removeItem('bx_name_v5');
-                    localStorage.removeItem('bx_tiers_v5');
+                    delete this.players[targetId];
                     
-                    this.myId = null;
+                    if (isMe) {
+                        localStorage.removeItem('bx_uid_v6');
+                        localStorage.removeItem('bx_name_v6');
+                        localStorage.removeItem('bx_tiers_v6');
+                        this.myId = null;
+                        this.openNameModal(false);
+                    }
                     this.renderList();
-                    
-                    // 最初からやり直すために登録画面を出す
-                    this.openNameModal(false);
                 }
             },
 
+            // --- 強さのスコア計算 ---
+            calculateScore: function(tierStr) {
+                if (tierStr === 'Unranked') return 0;
+                let parts = tierStr.split(' ');
+                let t = parts[0];
+                let sub = parts.slice(1).join(' ');
+                return (this.tierWeights[t] || 0) + (this.subTierWeights[sub] || 0);
+            },
+
+            // --- 描画とソート ---
             renderList: function() {
                 const list = document.getElementById('list');
                 list.innerHTML = '';
 
                 const arr = Object.values(this.players);
-                arr.sort(function(a, b) { return a.id.localeCompare(b.id); });
+                
+                // Tierの強さで自動ソート
+                arr.sort((a, b) => {
+                    let scoreA = this.calculateScore(a.sfc) + this.calculateScore(a.ugd);
+                    let scoreB = this.calculateScore(b.sfc) + this.calculateScore(b.ugd);
+                    if (scoreB !== scoreA) {
+                        return scoreB - scoreA; // 降順
+                    }
+                    // 同点の場合は名前順
+                    return a.name.localeCompare(b.name);
+                });
 
                 for (let i = 0; i < arr.length; i++) {
                     const p = arr[i];
@@ -304,22 +411,23 @@
                     const sfcClass = 't-' + p.sfc.substring(0, 2);
                     const ugdClass = 't-' + p.ugd.substring(0, 2);
 
+                    // Adminモードなら、他人のアイコンもクリック可能に
+                    const canEdit = isMe || this.isAdmin;
+
                     list.innerHTML += `
                         <div class="row ${isMe ? 'is-me' : ''}">
                             <div class="rank">${i + 1}</div>
                             <div class="name-wrapper">
                                 <div class="name">${p.name}</div>
-                                ${isMe ? `
-                                    <button class="action-btn" onclick="app.openNameModal(true)" title="Change Name">${this.icons.edit}</button>
-                                    <button class="action-btn del" onclick="app.deleteMe()" title="Delete Profile">${this.icons.trash}</button>
-                                ` : ''}
+                                ${isMe ? `<button class="action-btn" onclick="app.openNameModal(true)" title="Change Name">${this.icons.edit}</button>` : ''}
+                                ${(isMe || this.isAdmin) ? `<button class="action-btn del" onclick="app.deletePlayer('${p.id}')" title="Delete Profile">${this.icons.trash}</button>` : ''}
                             </div>
                             <div class="tier-cell">
-                                <div class="icon" ${isMe ? `onclick="app.openEdit('sfc')"` : ''}>${this.icons.sfc}</div>
+                                <div class="icon" ${canEdit ? `onclick="app.openEdit('sfc', '${p.id}')"` : ''}>${this.icons.sfc}</div>
                                 <div class="tier-text ${sfcClass}">${p.sfc.replace(' ', '<br>')}</div>
                             </div>
                             <div class="tier-cell">
-                                <div class="icon" ${isMe ? `onclick="app.openEdit('ugd')"` : ''}>${this.icons.ugd}</div>
+                                <div class="icon" ${canEdit ? `onclick="app.openEdit('ugd', '${p.id}')"` : ''}>${this.icons.ugd}</div>
                                 <div class="tier-text ${ugdClass}">${p.ugd.replace(' ', '<br>')}</div>
                             </div>
                         </div>
@@ -327,17 +435,15 @@
                 }
             },
 
+            // --- Tier 編集 ---
             buildTierButtons: function() {
                 const div = document.getElementById('tier-btns');
-                
-                // Unrankedボタン
                 const unBtn = document.createElement('button');
                 unBtn.className = 't-btn full-width';
                 unBtn.innerText = 'Unranked';
                 unBtn.onclick = function() { app.setTier('Unranked'); };
                 div.appendChild(unBtn);
 
-                // HT, LT ボタン
                 for (let i = 0; i < this.tiers.length; i++) {
                     for (let j = 0; j < this.subTiers.length; j++) {
                         const tierStr = this.tiers[i] + ' ' + this.subTiers[j];
@@ -350,24 +456,36 @@
                 }
             },
 
-            openEdit: function(cat) {
+            openEdit: function(cat, targetId) {
                 this.editingCat = cat;
+                this.editingUserId = targetId; // 誰のTierを変更するか保持
+                
+                const targetName = this.players[targetId].name;
                 document.getElementById('edit-title').innerText = (cat === 'sfc' ? 'SURFACE TIER' : 'UNDERG TIER');
+                document.getElementById('edit-target-name').innerText = `Editing for: ${targetName}`;
                 document.getElementById('modal-edit').style.display = 'flex';
             },
 
             setTier: function(tierStr) {
-                this.players[this.myId][this.editingCat] = tierStr;
-                localStorage.setItem('bx_tiers_v5', JSON.stringify({
-                    sfc: this.players[this.myId].sfc,
-                    ugd: this.players[this.myId].ugd
-                }));
+                const targetId = this.editingUserId;
+                this.players[targetId][this.editingCat] = tierStr;
                 
-                this.renderList();
+                // 自分のTierを変更した場合はローカルに保存
+                if (targetId === this.myId) {
+                    localStorage.setItem('bx_tiers_v6', JSON.stringify({
+                        sfc: this.players[this.myId].sfc,
+                        ugd: this.players[this.myId].ugd
+                    }));
+                }
+                
+                this.renderList(); // ソートも実行される
                 document.getElementById('modal-edit').style.display = 'none';
-                this.publishMyData();
+                
+                // 変更したデータをPublish
+                this.publishData(targetId);
             },
 
+            // --- MQTT ---
             connectMQTT: function() {
                 const options = { clientId: 'bx_' + Math.random().toString(16).substr(2, 8) };
                 this.client = mqtt.connect(this.brokerUrl, options);
@@ -383,31 +501,45 @@
                     try {
                         const data = JSON.parse(message.toString());
                         
-                        // 誰かが自分を削除した時の処理
                         if (data.type === 'delete' && data.id) {
+                            // 自分自身が管理者等に消された場合
+                            if(data.id === this.myId) {
+                                localStorage.removeItem('bx_uid_v6');
+                                localStorage.removeItem('bx_name_v6');
+                                localStorage.removeItem('bx_tiers_v6');
+                                this.myId = null;
+                                alert("Your profile was removed by Admin.");
+                                this.openNameModal(false);
+                            }
                             delete this.players[data.id];
                             this.renderList();
                             return;
                         }
 
-                        // 更新・追加の処理
                         const remotePlayer = data.p;
                         if (remotePlayer && remotePlayer.id) {
+                            // もし自分のデータが他（Admin）から変更されたら、ローカル保存も更新する
+                            if (remotePlayer.id === this.myId) {
+                                localStorage.setItem('bx_tiers_v6', JSON.stringify({
+                                    sfc: remotePlayer.sfc, ugd: remotePlayer.ugd
+                                }));
+                            }
+
                             this.players[remotePlayer.id] = remotePlayer;
                             this.renderList();
 
-                            // 同期リクエストがあれば返信する
+                            // 新規参加者から同期リクエストがあった場合
                             if (data.type === 'sync_req' && remotePlayer.id !== this.myId && this.myId && this.players[this.myId]) {
-                                this.publishMyData();
+                                this.publishData(this.myId);
                             }
                         }
                     } catch (err) {}
                 });
             },
 
-            publishMyData: function() {
-                if (this.client && this.client.connected && this.myId && this.players[this.myId]) {
-                    this.client.publish(this.topic, JSON.stringify({ type: 'update', p: this.players[this.myId] }));
+            publishData: function(playerId) {
+                if (this.client && this.client.connected && this.players[playerId]) {
+                    this.client.publish(this.topic, JSON.stringify({ type: 'update', p: this.players[playerId] }));
                 }
             }
         };
@@ -420,6 +552,9 @@
 
         document.getElementById('username').addEventListener('keypress', function (e) {
             if (e.key === 'Enter') app.submitName();
+        });
+        document.getElementById('admin-pwd').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') app.loginAdmin();
         });
 
         window.onload = function() {
