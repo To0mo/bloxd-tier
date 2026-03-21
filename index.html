@@ -7,7 +7,7 @@
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
 
-    <!-- ユーザー指定のCDN -->
+    <!-- MQTTライブラリ -->
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
     <style>
@@ -18,8 +18,8 @@
             --text-main: #f8fafc;
             --text-muted: #64748b;
             --accent: #3b82f6;
-            --tier-ht: #f59e0b; /* HT色 */
-            --tier-lt: #8b5cf6; /* LT色 */
+            --tier-ht: #f59e0b; /* HT (High Tier) Color */
+            --tier-lt: #8b5cf6; /* LT (Low Tier) Color */
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -33,26 +33,20 @@
 
         .container { max-width: 800px; margin: 0 auto; }
 
-        /* エラー表示用（通常は隠れる） */
-        #debug-log {
-            color: #ff4444; font-size: 11px; font-family: monospace;
-            background: rgba(255,0,0,0.1); padding: 10px; border-radius: 4px;
-            margin-bottom: 10px; display: none; white-space: pre-wrap;
-        }
-
         /* --- Header --- */
         .header {
             display: flex; justify-content: space-between; align-items: center;
             margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border);
         }
         .header h1 { font-size: 24px; font-weight: 900; letter-spacing: -1px; }
-        .status-box {
+        .live-sync {
             display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700;
-            color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 6px 12px; border-radius: 20px;
+            color: var(--text-muted);
         }
-        .dot { width: 8px; height: 8px; border-radius: 50%; background-color: #eab308; }
-        .dot.connected { background-color: #22c55e; box-shadow: 0 0 8px #22c55e; }
-        .dot.error { background-color: #ef4444; }
+        .dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background-color: #22c55e; box-shadow: 0 0 8px #22c55e;
+        }
 
         /* --- Table --- */
         .table-header {
@@ -65,23 +59,36 @@
         .row {
             display: grid; grid-template-columns: 40px 1fr 90px 90px; align-items: center;
             background-color: var(--card); border: 1px solid var(--border);
-            border-radius: 12px; padding: 12px 16px;
+            border-radius: 12px; padding: 12px 16px; transition: border-color 0.2s;
         }
         .row.is-me { border-color: var(--accent); background: #171b28; }
 
         .rank { font-weight: 700; color: var(--text-muted); font-size: 15px; }
-        .name { font-weight: 700; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 10px;}
+        
+        /* プレイヤー名表示部分 */
+        .name-wrapper { display: flex; align-items: center; gap: 8px; overflow: hidden; }
+        .name { 
+            font-weight: 700; font-size: 16px; white-space: nowrap; 
+            overflow: hidden; text-overflow: ellipsis; 
+        }
+        /* 名前変更アイコン（自分のみ表示） */
+        .edit-name-btn {
+            background: none; border: none; fill: var(--text-muted); cursor: pointer;
+            padding: 4px; border-radius: 4px; display: none;
+        }
+        .is-me .edit-name-btn { display: flex; align-items: center; justify-content: center; }
+        .is-me .edit-name-btn:hover { fill: var(--accent); background: rgba(59, 130, 246, 0.1); }
+        .edit-name-btn svg { width: 14px; height: 14px; }
 
         /* --- Icons --- */
         .tier-cell { display: flex; flex-direction: column; align-items: center; gap: 6px; }
         .icon {
-            width: 38px; height: 38px; background: #1a1d27; border: 1px solid var(--border);
+            width: 40px; height: 40px; background: #1a1d27; border: 1px solid var(--border);
             border-radius: 8px; display: flex; align-items: center; justify-content: center;
         }
-        .icon svg { width: 22px; height: 22px; fill: var(--text-muted); }
+        .icon svg { width: 24px; height: 24px; }
         .is-me .icon { cursor: pointer; border-color: #334155; }
         .is-me .icon:hover { border-color: var(--accent); background: #1e293b; }
-        .is-me .icon:hover svg { fill: var(--text-main); }
 
         .tier-text { font-size: 10px; font-weight: 900; text-align: center; line-height: 1.2; }
         .t-HT { color: var(--tier-ht); }
@@ -97,15 +104,20 @@
             background: var(--card); width: 90%; max-width: 420px;
             border: 1px solid var(--border); border-radius: 16px; padding: 24px; text-align: center;
         }
-        h2 { font-size: 22px; margin-bottom: 20px; font-weight: 900; }
+        h2 { font-size: 20px; margin-bottom: 10px; font-weight: 900; }
+        p.desc { font-size: 12px; color: var(--text-muted); margin-bottom: 20px; }
         input {
-            width: 100%; padding: 16px; background: var(--bg); border: 1px solid var(--border);
-            color: white; border-radius: 8px; font-size: 16px; margin-bottom: 20px; font-family: inherit; font-weight: 600;
+            width: 100%; padding: 14px; background: var(--bg); border: 1px solid var(--border);
+            color: white; border-radius: 8px; font-size: 16px; margin-bottom: 10px; font-family: inherit; font-weight: 600;
         }
+        .error-msg { color: #ef4444; font-size: 12px; margin-bottom: 15px; height: 14px; font-weight: 600;}
+        
         .btn {
-            width: 100%; padding: 16px; background: var(--accent); color: white;
-            border: none; border-radius: 8px; font-weight: 700; font-size: 16px; cursor: pointer;
+            width: 100%; padding: 14px; background: var(--accent); color: white;
+            border: none; border-radius: 8px; font-weight: 700; font-size: 15px; cursor: pointer;
         }
+        .btn:disabled { background: #334155; cursor: not-allowed; color: #94a3b8; }
+
         .tier-grid {
             display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-height: 50vh; overflow-y: auto;
         }
@@ -118,7 +130,7 @@
         @media (max-width: 480px) {
             .table-header, .row { grid-template-columns: 30px 1fr 75px 75px; padding: 10px; gap: 4px; }
             .icon { width: 34px; height: 34px; }
-            .icon svg { width: 18px; height: 18px; }
+            .icon svg { width: 20px; height: 20px; }
             .tier-grid { grid-template-columns: 1fr; }
         }
     </style>
@@ -126,42 +138,38 @@
 <body>
 
     <div class="container">
-        <!-- エラー出力用 -->
-        <div id="debug-log"></div>
-
         <header class="header">
             <h1>RANKINGS</h1>
-            <div class="status-box">
-                <div id="dot" class="dot"></div>
-                <span id="status-text">Init...</span>
+            <div class="live-sync">
+                <div class="dot"></div>
+                LIVE SYNC
             </div>
         </header>
 
         <div class="table-header">
             <div>#</div>
-            <div>Player</div>
+            <div>PLAYER</div>
             <div style="text-align: center;">SURFACE</div>
             <div style="text-align: center;">UNDERG</div>
         </div>
 
-        <!-- 初期状態は Loading... にしておく -->
         <div id="list" class="list">
-            <div style="text-align: center; padding: 40px; color: #64748b; font-weight: 700;">
-                Loading Rankings...
-            </div>
+            <!-- プレイヤーリストがここに表示されます -->
         </div>
     </div>
 
-    <!-- 登録モーダル -->
-    <div id="modal-reg" class="modal">
+    <!-- 名前登録/変更 モーダル -->
+    <div id="modal-name" class="modal">
         <div class="modal-content">
-            <h2>ENTER NAME</h2>
-            <input type="text" id="username" placeholder="Your Name" maxlength="15">
-            <button class="btn" onclick="app.register()">JOIN</button>
+            <h2 id="name-modal-title">ENTER NAME</h2>
+            <p class="desc">Only letters, numbers, and underscores (_). Min 3 chars.</p>
+            <input type="text" id="username" placeholder="Your_Name" maxlength="15">
+            <div id="name-error" class="error-msg"></div>
+            <button id="btn-submit-name" class="btn" onclick="app.submitName()">JOIN</button>
         </div>
     </div>
 
-    <!-- 編集モーダル -->
+    <!-- Tier編集モーダル -->
     <div id="modal-edit" class="modal">
         <div class="modal-content">
             <h2 id="edit-title">SELECT TIER</h2>
@@ -170,26 +178,36 @@
     </div>
 
     <script>
-        // === 万が一JSエラーが起きたら画面に表示する仕組み ===
-        window.onerror = function(msg, url, line) {
-            const log = document.getElementById('debug-log');
-            log.style.display = 'block';
-            log.innerText += `\nError: ${msg} (Line: ${line})`;
-        };
-
-        // アプリケーション全体を一つのオブジェクトにまとめる（スコープ汚染とエラー防止）
         const app = {
-            // ユーザー指定のShiftr.io
             brokerUrl: 'wss://public:public@public.cloud.shiftr.io',
-            topic: 'bloxd/global/tier_list',
+            topic: 'bloxd/official/tiers_v3',
             
-            // アイコン (交差する剣 / 上向きスパイク)
+            // ピクセルアート風カスタムSVGアイコン
             icons: {
-                sfc: `<svg viewBox="0 0 24 24"><path d="M19.7,4.3c-0.4-0.4-1-0.4-1.4,0L12,10.6L5.7,4.3c-0.4-0.4-1-0.4-1.4,0s-0.4,1,0,1.4l6.3,6.3l-6.3,6.3c-0.4,0.4-0.4,1,0,1.4C4.5,19.9,4.7,20,5,20s0.5-0.1,0.7-0.3l6.3-6.3l6.3,6.3c0.2,0.2,0.5,0.3,0.7,0.3s0.5-0.1,0.7-0.3c0.4-0.4,0.4-1,0-1.4L13.4,12l6.3-6.3C20.1,5.3,20.1,4.7,19.7,4.3z"/></svg>`,
-                ugd: `<svg viewBox="0 0 24 24"><path d="M12,2L8,12h3v10h2V12h3L12,2z M4,8l-3,8h2v6h2v-6h2L4,8z M20,8l-3,8h2v6h2v-6h2L20,8z"/></svg>`
+                // 王冠と交差した剣
+                sfc: `<svg viewBox="0 0 24 24" shape-rendering="crispEdges">
+                        <!-- Crown -->
+                        <path d="M7 6h10v2H7z M6 4h2v2H6z M11 3h2v2h-2z M16 4h2v2h-2z" fill="#fbbf24"/>
+                        <!-- Swords -->
+                        <path d="M5 19h2v-2h2v-2h2v-2h2v2h-2v2h-2v2H5z M11 13h2v-2h2V9h2V7h-2V9h-2v2h-2z" fill="#38bdf8"/>
+                        <path d="M19 19h-2v-2h-2v-2h-2v-2h-2v2h2v2h2v2h2z M13 13h-2v-2h-2V9h-2V7h2V9h2v2h2z" fill="#38bdf8"/>
+                        <!-- Handles -->
+                        <path d="M4 20h2v-2H4z M20 20h-2v-2h2z M7 18h2v-2H7z M17 18h-2v-2h2z" fill="#8b4513"/>
+                      </svg>`,
+                // 3本の上向きスパイク
+                ugd: `<svg viewBox="0 0 24 24" shape-rendering="crispEdges">
+                        <!-- Black outline -->
+                        <path d="M3 21h18V9h-4V3h-6v4H7v2H3z" fill="#000"/>
+                        <!-- Spikes Fill -->
+                        <path d="M5 20h4v-9H5z M11 20h4V5h-4z M17 20h4v-7h-4z" fill="#8b4513"/>
+                        <!-- Highlights -->
+                        <path d="M5 11h2v9H5z M11 5h2v15h-2z M17 13h2v7h-2z" fill="#a0522d"/>
+                      </svg>`,
+                // 鉛筆アイコン
+                edit: `<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>`
             },
 
-            // MT廃止、HTとLTのみ
+            // HTとLTのみ
             tiers: ["HT2", "HT3", "HT4", "HT5", "LT1", "LT2", "LT3", "LT4", "LT5"],
             subTiers: ["High", "Mid High", "Mid", "Mid Low", "Low"],
 
@@ -197,59 +215,88 @@
             myId: null,
             client: null,
             editingCat: '',
+            isChangingName: false,
 
             init: function() {
-                try {
-                    this.buildTierButtons();
-                    
-                    this.myId = localStorage.getItem('bx_uid_shiftr');
-                    const myName = localStorage.getItem('bx_name_shiftr');
+                this.buildTierButtons();
+                this.myId = localStorage.getItem('bx_uid');
+                const myName = localStorage.getItem('bx_name');
 
-                    // 最初からテストデータを2つ入れておく（絶対にUIが空にならないように）
-                    this.players['test1'] = { id: 'test1', name: 'Server_Host', sfc: 'HT2 High', ugd: 'HT3 Mid' };
-                    this.players['test2'] = { id: 'test2', name: 'Pro_Player', sfc: 'LT1 Low', ugd: 'LT2 High' };
+                this.connectMQTT();
 
-                    if (!this.myId || !myName) {
-                        document.getElementById('modal-reg').style.display = 'flex';
-                        this.setStatus('Waiting Login', '');
-                        this.renderList(); // テストデータだけ描画
-                    } else {
-                        // 自分のデータをセット
-                        this.players[this.myId] = { id: this.myId, name: myName, sfc: 'LT5 Low', ugd: 'LT5 Low' };
-                        this.renderList();
-                        this.connectMQTT();
+                if (!this.myId || !myName) {
+                    // 新規ユーザー
+                    this.openNameModal(false);
+                } else {
+                    // 既存ユーザー
+                    this.players[this.myId] = { id: this.myId, name: myName, sfc: 'LT5 Low', ugd: 'LT5 Low' };
+                    // localStorageに保存されているTier情報があれば復元（簡易実装）
+                    const savedTiers = localStorage.getItem('bx_tiers');
+                    if (savedTiers) {
+                        const t = JSON.parse(savedTiers);
+                        this.players[this.myId].sfc = t.sfc || 'LT5 Low';
+                        this.players[this.myId].ugd = t.ugd || 'LT5 Low';
                     }
-                } catch (e) {
-                    window.onerror(e.message, 'init', 0);
-                }
-            },
-
-            register: function() {
-                try {
-                    const name = document.getElementById('username').value.trim();
-                    if (name.length < 2) return;
-                    
-                    this.myId = 'u_' + Math.random().toString(36).substr(2, 9);
-                    localStorage.setItem('bx_uid_shiftr', this.myId);
-                    localStorage.setItem('bx_name_shiftr', name);
-
-                    this.players[this.myId] = { id: this.myId, name: name, sfc: 'LT5 Low', ugd: 'LT5 Low' };
-                    document.getElementById('modal-reg').style.display = 'none';
-                    
                     this.renderList();
-                    this.connectMQTT();
-                } catch (e) {
-                    window.onerror(e.message, 'register', 0);
                 }
             },
 
+            // --- 名前関連の処理 ---
+            openNameModal: function(isChange) {
+                this.isChangingName = isChange;
+                document.getElementById('name-modal-title').innerText = isChange ? 'CHANGE NAME' : 'ENTER NAME';
+                document.getElementById('btn-submit-name').innerText = isChange ? 'UPDATE' : 'JOIN';
+                document.getElementById('username').value = isChange ? localStorage.getItem('bx_name') : '';
+                document.getElementById('name-error').innerText = '';
+                document.getElementById('modal-name').style.display = 'flex';
+            },
+
+            submitName: function() {
+                const nameInput = document.getElementById('username').value.trim();
+                const errorDiv = document.getElementById('name-error');
+                
+                // バリデーション: 英数字とアンダースコア、3〜15文字
+                const regex = /^[a-zA-Z0-9_]{3,15}$/;
+                if (!regex.test(nameInput)) {
+                    errorDiv.innerText = "Invalid format or too short.";
+                    return;
+                }
+
+                // 重複チェック
+                const lowerName = nameInput.toLowerCase();
+                for (const id in this.players) {
+                    if (id !== this.myId && this.players[id].name.toLowerCase() === lowerName) {
+                        errorDiv.innerText = "This name is already taken.";
+                        return;
+                    }
+                }
+
+                // OKなら登録・更新
+                errorDiv.innerText = "";
+                
+                if (!this.myId) {
+                    this.myId = 'u_' + Math.random().toString(36).substr(2, 9);
+                    localStorage.setItem('bx_uid', this.myId);
+                    this.players[this.myId] = { id: this.myId, name: nameInput, sfc: 'LT5 Low', ugd: 'LT5 Low' };
+                } else {
+                    this.players[this.myId].name = nameInput;
+                }
+
+                localStorage.setItem('bx_name', nameInput);
+                document.getElementById('modal-name').style.display = 'none';
+                
+                this.renderList();
+                this.publishMyData();
+            },
+
+            // --- 描画処理 ---
             renderList: function() {
                 const list = document.getElementById('list');
-                list.innerHTML = ''; // Loading文字を消す
+                list.innerHTML = '';
 
                 const arr = Object.values(this.players);
-                // 簡易ソート（自分が上の方に来るように）
-                arr.sort(function(a, b) { return b.id.localeCompare(a.id); });
+                // 順序を固定するためIDでソート（本番ではポイント等でソート）
+                arr.sort(function(a, b) { return a.id.localeCompare(b.id); });
 
                 for (let i = 0; i < arr.length; i++) {
                     const p = arr[i];
@@ -260,7 +307,10 @@
                     list.innerHTML += `
                         <div class="row ${isMe ? 'is-me' : ''}">
                             <div class="rank">${i + 1}</div>
-                            <div class="name">${p.name}</div>
+                            <div class="name-wrapper">
+                                <div class="name">${p.name}</div>
+                                ${isMe ? `<button class="edit-name-btn" onclick="app.openNameModal(true)" title="Change Name">${this.icons.edit}</button>` : ''}
+                            </div>
                             <div class="tier-cell">
                                 <div class="icon" ${isMe ? `onclick="app.openEdit('sfc')"` : ''}>${this.icons.sfc}</div>
                                 <div class="tier-text ${sfcClass}">${p.sfc.replace(' ', '<br>')}</div>
@@ -274,6 +324,7 @@
                 }
             },
 
+            // --- Tier編集処理 ---
             buildTierButtons: function() {
                 const div = document.getElementById('tier-btns');
                 for (let i = 0; i < this.tiers.length; i++) {
@@ -296,71 +347,68 @@
 
             setTier: function(tierStr) {
                 this.players[this.myId][this.editingCat] = tierStr;
+                // ローカルに保存
+                localStorage.setItem('bx_tiers', JSON.stringify({
+                    sfc: this.players[this.myId].sfc,
+                    ugd: this.players[this.myId].ugd
+                }));
+                
                 this.renderList();
                 document.getElementById('modal-edit').style.display = 'none';
-
-                if (this.client && this.client.connected) {
-                    this.client.publish(this.topic, JSON.stringify({ type: 'upd', p: this.players[this.myId] }));
-                }
+                this.publishMyData();
             },
 
+            // --- MQTT通信 ---
             connectMQTT: function() {
-                if (typeof mqtt === 'undefined') {
-                    this.setStatus('MQTT Blocked', 'error');
-                    return;
-                }
-
-                this.setStatus('Connecting...', '');
-                
-                // 接続時のオプションを指定 (shiftr.io向け)
-                const options = {
-                    clientId: 'bloxd_' + Math.random().toString(16).substr(2, 8)
-                };
-
+                const options = { clientId: 'bx_' + Math.random().toString(16).substr(2, 8) };
                 this.client = mqtt.connect(this.brokerUrl, options);
 
                 this.client.on('connect', () => {
-                    this.setStatus('Live Sync', 'connected');
                     this.client.subscribe(this.topic);
-                    
-                    // 接続したら自分の情報を送信
-                    this.client.publish(this.topic, JSON.stringify({ type: 'sync', p: this.players[this.myId] }));
+                    // 接続後、自分が登録済みならデータを配信して全体と同期
+                    if (this.myId && this.players[this.myId]) {
+                        this.client.publish(this.topic, JSON.stringify({ type: 'sync_req', p: this.players[this.myId] }));
+                    }
                 });
 
                 this.client.on('message', (topic, message) => {
                     try {
                         const data = JSON.parse(message.toString());
-                        // テストデータは上書きしない
-                        if (data.p && !data.p.id.startsWith('test')) {
-                            this.players[data.p.id] = data.p;
-                            this.renderList();
-                        }
-                        // 同期リクエストが来たら、自分のデータを打ち返す
-                        if (data.type === 'sync' && data.p.id !== this.myId) {
-                            this.client.publish(this.topic, JSON.stringify({ type: 'upd', p: this.players[this.myId] }));
-                        }
-                    } catch (err) {
-                        // JSONパースエラー等は無視
-                    }
-                });
+                        const remotePlayer = data.p;
 
-                this.client.on('error', (err) => {
-                    this.setStatus('Shiftr.io Error', 'error');
+                        if (remotePlayer && remotePlayer.id) {
+                            // 受信したデータをローカルに保存
+                            this.players[remotePlayer.id] = remotePlayer;
+                            this.renderList();
+
+                            // 誰かが同期をリクエストしてきたら、自分の最新データを送り返す
+                            if (data.type === 'sync_req' && remotePlayer.id !== this.myId) {
+                                this.publishMyData();
+                            }
+                        }
+                    } catch (err) {}
                 });
             },
 
-            setStatus: function(text, cName) {
-                document.getElementById('status-text').innerText = text;
-                document.getElementById('dot').className = 'dot ' + cName;
+            publishMyData: function() {
+                if (this.client && this.client.connected && this.myId && this.players[this.myId]) {
+                    this.client.publish(this.topic, JSON.stringify({ type: 'update', p: this.players[this.myId] }));
+                }
             }
         };
 
         // モーダル外クリックで閉じる
         window.onclick = function(e) {
-            if (e.target.classList.contains('modal')) e.target.style.display = 'none';
+            if (e.target.classList.contains('modal') && e.target.id !== 'modal-name') {
+                e.target.style.display = 'none';
+            }
         };
 
-        // ページ読み込み完了時に実行
+        // Enterキーで名前登録
+        document.getElementById('username').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') app.submitName();
+        });
+
         window.onload = function() {
             app.init();
         };
