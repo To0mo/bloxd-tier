@@ -1,228 +1,1307 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
     <meta charset="UTF-8">
-    <title>Bloxd Skin Composer - Final Edition</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bloxd Tier Rankings</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <style>
         :root {
-            --bg: #0b0e14;
-            --panel: #1a1f2e;
-            --accent: #ffcc00;
-            --text: #ffffff;
-            --item-bg: #252b3d;
+            --bg: #020305;
+            --card: rgba(13, 16, 26, 0.5);
+            --border: rgba(255, 255, 255, 0.04);
+            --text-main: #f1f5f9;
+            --text-muted: #64748b;
+            --accent: #3b82f6;
+            --accent-glow: rgba(59, 130, 246, 0.2);
+            --danger: #ef4444;
+            --tier-ht: #f59e0b;
+            --tier-lt: #8b5cf6;
+            --admin-color: #10b981;
+            --glass-bg: rgba(7, 10, 15, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.06);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
         }
 
         body {
-            background-color: var(--bg); color: var(--text);
-            font-family: 'Segoe UI', sans-serif; margin: 0;
-            display: flex; height: 100vh; overflow: hidden;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            background-image:
+                linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)),
+                url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAIUlEQVR4nGOQUtX5r23pjBMzUEcBPsyArgPdRCooIOQGAAigZFnRRKyWAAAAAElFTkSuQmCC"),
+                radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 0% 100%, rgba(139, 92, 246, 0.05) 0%, transparent 40%);
+            background-repeat: no-repeat, repeat, no-repeat, no-repeat;
+            background-size: cover, 100px 100px, auto, auto;
+            background-attachment: fixed;
+            image-rendering: pixelated;
+            color: var(--text-main);
+            padding: 20px 10px;
+            padding-bottom: 80px;
+            min-height: 100vh;
         }
 
-        /* 左側：プレビュー固定 */
-        .sidebar {
-            width: 300px; background: #000;
-            display: flex; flex-direction: column; align-items: center;
-            padding: 20px; border-right: 2px solid #333; z-index: 100;
+        .container {
+            max-width: 850px;
+            margin: 0 auto;
+            position: relative;
         }
 
-        .canvas {
-            position: relative; width: 240px; height: 240px;
-            background: #111; border-radius: 12px; border: 2px solid #444;
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+            padding: 20px 0;
+            border-bottom: 1px solid var(--border);
+            animation: fadeInDown 0.8s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        .canvas img {
-            position: absolute; top: 0; left: 0;
-            width: 100%; height: 100%; image-rendering: pixelated;
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
         }
 
-        .info-log {
-            margin-top: 20px; width: 100%; font-family: monospace; font-size: 13px; color: #aaa;
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
         }
-        .info-log div { margin-bottom: 8px; border-bottom: 1px solid #222; padding-bottom: 4px; }
-        .info-log span { color: var(--accent); float: right; }
 
-        /* 右側：メイン操作エリア */
-        .editor { flex: 1; display: flex; flex-direction: column; background: var(--panel); }
-
-        .tabs { display: flex; background: #000; padding: 10px 10px 0; gap: 4px; }
-        .tab {
-            padding: 12px 20px; background: #222; border: none; color: #888;
-            cursor: pointer; border-radius: 6px 6px 0 0; font-weight: bold;
+        .header-logo {
+            height: 48px;
+            width: 48px;
+            border-radius: 12px;
+            object-fit: cover;
+            border: 2px solid var(--border);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            transition: transform 0.3s ease;
         }
-        .tab.active { background: var(--panel); color: var(--accent); border-bottom: 2px solid var(--accent); }
 
-        /* カラーパレット（あとの数字） */
-        .palette { padding: 15px 20px; background: rgba(0,0,0,0.3); border-bottom: 1px solid #333; }
-        .palette-title { font-size: 11px; color: #777; margin-bottom: 10px; text-transform: uppercase; }
-        .color-group { display: flex; gap: 8px; flex-wrap: wrap; }
-
-        .color-btn {
-            width: 36px; height: 36px; border-radius: 50%; border: 2px solid #444;
-            cursor: pointer; display: flex; align-items: center; justify-content: center;
-            font-size: 12px; font-weight: bold; color: white; transition: 0.1s;
+        .header-logo:hover {
+            transform: scale(1.05) rotate(2deg);
         }
-        .color-btn.active { border-color: var(--accent); transform: scale(1.1); box-shadow: 0 0 10px var(--accent); }
 
-        /* スタイルグリッド（最初の数字） */
-        .grid { flex: 1; padding: 20px; display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 12px; overflow-y: auto; }
-        .grid-item {
-            background: var(--item-bg); border: 2px solid #333; border-radius: 8px;
-            aspect-ratio: 1; cursor: pointer; display: flex; flex-direction: column;
-            align-items: center; justify-content: center; position: relative;
+        .header h1 {
+            font-size: 28px;
+            margin: 0;
+            display: flex;
+            align-items: center;
         }
-        .grid-item.active { border-color: var(--accent); background: #2c2a20; }
-        .grid-item img { width: 85%; height: 85%; image-rendering: pixelated; }
-        .id-badge { position: absolute; bottom: 4px; font-size: 10px; color: #666; font-family: monospace; }
 
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
+        .Title {
+            color: #fff;
+            font-weight: 900;
+            line-height: 1.2;
+            padding-top: .15rem;
+            position: relative;
+            text-shadow: -.2rem -.2rem 0 #303a59, 0 -.2rem 0 #303a59, .3rem -.2rem 0 #303a59, .3rem 0 0 #303a59, .3rem .2rem 0 #303a59, 0 .2rem 0 #303a59, -.2rem .2rem 0 #303a59;
+            white-space: nowrap;
+        }
+
+        .header h1 span.admin-badge {
+            font-size: 10px;
+            font-weight: 800;
+            background: var(--admin-color);
+            color: #064e3b;
+            padding: 2px 8px;
+            border-radius: 6px;
+            margin-left: 10px;
+            vertical-align: middle;
+            text-shadow: none;
+            display: none;
+        }
+
+        .live-sync {
+            display: flex;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 8px 12px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #22c55e;
+            box-shadow: 0 0 10px #22c55e;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            50% {
+                transform: scale(1.2);
+                opacity: 0.7;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .table-header {
+            display: grid;
+            grid-template-columns: 40px 1fr 80px 80px;
+            padding: 0 20px 16px;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: 40px 1fr 80px 80px;
+            align-items: center;
+            background-color: var(--card);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 16px 20px;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        .row.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .row:hover {
+            transform: translateY(-4px) scale(1.01);
+            background-color: rgba(30, 41, 59, 0.6);
+            border-color: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(59, 130, 246, 0.1);
+        }
+
+        .row.is-me {
+            border-color: var(--accent);
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%);
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+
+        .admin-mode .row:not(.is-me):hover {
+            border-color: var(--admin-color);
+            box-shadow: 0 0 20px rgba(52, 211, 153, 0.2);
+        }
+
+        .rank {
+            font-weight: 800;
+            color: var(--text-muted);
+            font-size: 18px;
+            font-family: 'Inter', sans-serif;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .name-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            overflow: hidden;
+        }
+
+        .name {
+            font-weight: 800;
+            font-size: 17px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-right: 4px;
+            color: #fff;
+        }
+
+        .action-btn {
+            background: none;
+            border: none;
+            fill: var(--text-muted);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .is-me .action-btn {
+            display: flex;
+        }
+
+        .admin-mode .action-btn.del {
+            display: flex;
+        }
+
+        .action-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            fill: var(--text-main);
+        }
+
+        .action-btn.del:hover {
+            background: rgba(239, 68, 68, 0.2);
+            fill: var(--danger);
+        }
+
+        .action-btn svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        .tier-cell {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .icon {
+            width: 44px;
+            height: 44px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .icon svg {
+            width: 24px;
+            height: 24px;
+            fill: var(--text-muted);
+            transition: all 0.3s ease;
+        }
+
+        .is-me .icon {
+            cursor: pointer;
+            border-color: #334155;
+        }
+
+        .is-me .icon:hover {
+            border-color: var(--accent);
+            background: #1e293b;
+        }
+
+        .is-me .icon:hover svg {
+            fill: var(--text-main);
+        }
+
+        .admin-mode .icon {
+            cursor: pointer;
+            border-color: #334155;
+        }
+
+        .admin-mode .icon:hover {
+            border-color: var(--admin-color);
+            background: #13241e;
+        }
+
+        .admin-mode .icon:hover svg {
+            fill: var(--admin-color);
+        }
+
+        .tier-text {
+            font-size: 10px;
+            font-weight: 900;
+            text-align: center;
+            line-height: 1.2;
+        }
+
+        .t-HT {
+            color: var(--tier-ht);
+        }
+
+        .t-LT {
+            color: var(--tier-lt);
+        }
+
+        .t-Un {
+            color: var(--text-muted);
+        }
+
+        .admin-footer {
+            position: absolute;
+            bottom: -40px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+        }
+
+        .admin-link {
+            font-size: 10px;
+            color: #334155;
+            text-decoration: none;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .admin-link:hover {
+            color: var(--text-muted);
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(8px);
+        }
+
+        .modal-content {
+            background: var(--glass-bg);
+            backdrop-filter: blur(24px);
+            width: 90%;
+            max-width: 400px;
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 32px;
+            text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            animation: modalPop 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes modalPop {
+            from {
+                opacity: 0;
+                transform: scale(0.9) translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        h2 {
+            font-size: 24px;
+            margin-bottom: 12px;
+            font-weight: 900;
+            letter-spacing: -1px;
+        }
+
+        p.desc {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+
+        input {
+            width: 100%;
+            padding: 14px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: white;
+            border-radius: 8px;
+            font-size: 16px;
+            margin-bottom: 10px;
+            font-family: inherit;
+            font-weight: 600;
+        }
+
+        .error-msg {
+            color: var(--danger);
+            font-size: 12px;
+            margin-bottom: 15px;
+            height: 14px;
+            font-weight: 600;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 16px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-weight: 800;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px var(--accent-glow);
+            margin-bottom: 12px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px var(--accent-glow);
+            filter: brightness(1.1);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn.secondary {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-muted);
+            box-shadow: none;
+            border: 1px solid var(--border);
+        }
+
+        .btn.secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-main);
+            border-color: var(--text-muted);
+        }
+
+        .btn.admin-btn {
+            background: var(--admin-color);
+            box-shadow: 0 4px 12px rgba(52, 211, 153, 0.3);
+            color: #064e3b;
+        }
+
+        .tier-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            max-height: 50vh;
+            overflow-y: auto;
+        }
+
+
+        /* Skin Composer Styles */
+        .skin-editor-container {
+            display: flex;
+            gap: 24px;
+            height: 60vh;
+            min-height: 450px;
+        }
+
+        .skin-sidebar {
+            width: 200px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .skin-canvas {
+            position: relative;
+            width: 160px;
+            height: 160px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            overflow: hidden;
+            margin: 0 auto;
+        }
+
+        .skin-canvas img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: auto;
+            transform: scale(1.0);
+            transform-origin: top center;
+            image-rendering: pixelated;
+        }
+
+        .skin-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            overflow: hidden;
+        }
+
+        .skin-tabs {
+            display: flex;
+            gap: 4px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 8px;
+        }
+
+        .skin-tab {
+            padding: 8px 12px;
+            font-size: 12px;
+            font-weight: 800;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .skin-tab.active {
+            color: var(--accent);
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .skin-palette {
+            display: none;
+        }
+
+        .skin-color-btn {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 1px solid var(--border);
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .skin-color-btn.active {
+            transform: scale(1.2);
+            border-color: #fff;
+            box-shadow: 0 0 8px var(--accent);
+        }
+
+        .skin-grid {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+            gap: 8px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .skin-grid-item {
+            width: 60px;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            position: relative;
+            flex-shrink: 0;
+            overflow: hidden;
+        }
+
+        .skin-grid-item:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .skin-grid-item.active {
+            border-color: var(--accent);
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .skin-grid-item img {
+            width: 90%;
+            height: 90%;
+            image-rendering: pixelated;
+        }
+
+        .mini-skin {
+            width: 40px;
+            height: 40px;
+            position: relative;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 6px;
+            overflow: hidden;
+            margin-right: 12px;
+            flex-shrink: 0;
+            border: 1px solid var(--border);
+        }
+
+        .mini-skin img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: auto;
+            transform: scale(1.2);
+            transform-origin: top center;
+            image-rendering: pixelated;
+        }
+
+        #modal-skin .modal-content {
+            max-width: 700px;
+            width: 95%;
+        }
+
+        @media (max-width: 600px) {
+            .skin-editor-container {
+                flex-direction: column;
+                height: 70vh;
+            }
+
+            .skin-sidebar {
+                width: 100%;
+                flex-direction: row;
+                align-items: center;
+                gap: 16px;
+            }
+
+            .skin-canvas {
+                width: 100px;
+                height: 100px;
+            }
+        }
+
+        .t-btn {
+            background: #1a1d27;
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 14px 10px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .t-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: #1e293b;
+        }
+
+        .t-btn.full-width {
+            grid-column: 1 / -1;
+            background: #232736;
+            border-color: #334155;
+            color: var(--text-muted);
+        }
+
+        .t-btn.full-width:hover {
+            border-color: var(--text-main);
+            color: var(--text-main);
+        }
+
+        @media (max-width: 480px) {
+
+            .table-header,
+            .row {
+                grid-template-columns: 40px 1fr 80px 80px;
+                padding: 12px 14px;
+                gap: 8px;
+            }
+
+            .header h1 {
+                font-size: 22px;
+            }
+
+            .icon {
+                width: 38px;
+                height: 38px;
+            }
+
+            .icon svg {
+                width: 20px;
+                height: 20px;
+            }
+
+            .tier-grid {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
+
 <body>
-
-    <div class="sidebar">
-        <h2 style="color: var(--accent);">Bloxd Composer</h2>
-        <div class="canvas">
-            <!-- 重なり順: Skin -> Eyebrows -> Eyes -> Head(Hair) -->
-            <img id="v-skin" src="">
-            <img id="v-eyebrows" src="">
-            <img id="v-eyes" src="">
-            <img id="v-head" src="">
+    <div class="container" id="main-container">
+        <header class="header">
+            <div class="header-left">
+                <!-- 追加されたロゴ画像 -->
+                <img src="https://iili.io/qkgamfn.jpg" alt="Logo" class="header-logo">
+                <h1><span class="Title">BloxdTiers</span><span class="admin-badge" id="admin-badge">ADMIN</span></h1>
+            </div>
+            <div class="header-right">
+                <button class="btn secondary t-btn" onclick="app.openSkinEditor()"
+                    style="padding: 8px 16px; font-size: 12px;">EDIT SKIN</button>
+                <div class="live-sync" title="Connected">
+                    <div class="dot"></div>
+                </div>
+            </div>
+        </header>
+        <div class="table-header">
+            <div>#</div>
+            <div>PLAYER</div>
+            <div style="text-align: center;">地上</div>
+            <div style="text-align: center;">地下</div>
         </div>
-        
-        <div class="info-log">
-            <div>Skin <span>pfp_skin_<i id="log-skin"></i></span></div>
-            <div>Eyes <span>pfp_eyes_<i id="log-eyes"></i></span></div>
-            <div>Brows <span>pfp_eyebrows_<i id="log-eyebrows"></i></span></div>
-            <div>Hair <span>pfp_head_<i id="log-head"></i></span></div>
+        <div id="list" class="list">
+            <!-- プレイヤーリスト -->
         </div>
-        
-        <button onclick="randomize()" style="margin-top:auto; width:100%; padding:15px; background:var(--accent); border:none; font-weight:bold; cursor:pointer; border-radius:8px;">RANDOMIZE</button>
+        <div class="admin-footer">
+            <span class="admin-link" onclick="app.openAdminLogin()">Admin Access</span>
+        </div>
     </div>
-
-    <div class="editor">
-        <div class="tabs">
-            <button class="tab active" onclick="setCategory('skin')">SKIN</button>
-            <button class="tab" onclick="setCategory('eyes')">EYES</button>
-            <button class="tab" onclick="setCategory('eyebrows')">BROWS</button>
-            <button class="tab" onclick="setCategory('head')">HAIR</button>
+    <!-- Modals -->
+    <div id="modal-name" class="modal">
+        <div class="modal-content">
+            <h2 id="name-modal-title">ENTER NAME</h2>
+            <p class="desc">Letters, numbers, and underscores (_) only. Min 3 chars.</p>
+            <input type="text" id="username" placeholder="Your_Name" maxlength="20">
+            <div id="name-error" class="error-msg"></div>
+            <button id="btn-submit-name" class="btn" onclick="app.submitName()">JOIN RANKINGS</button>
+            <button id="btn-guest" class="btn secondary" onclick="app.closeModals()">VIEW AS GUEST</button>
         </div>
-
-        <div class="palette">
-            <div class="palette-title">Color Index (あとの数字)</div>
-            <div class="color-group" id="color-list"></div>
-        </div>
-
-        <div class="grid" id="main-grid"></div>
     </div>
+    <div id="modal-edit" class="modal">
+        <div class="modal-content">
+            <h2 id="edit-title">SELECT TIER</h2>
+            <p class="desc" id="edit-target-name"></p>
+            <div id="tier-btns" class="tier-grid"></div>
+        </div>
+    </div>
+    <div id="modal-admin" class="modal">
+        <div class="modal-content">
+            <h2>DEVELOPER ACCESS</h2>
+            <input type="password" id="admin-pwd" placeholder="Password">
+            <div id="admin-error" class="error-msg"></div>
+            <button class="btn admin-btn" onclick="app.loginAdmin()">LOGIN</button>
+        </div>
+    </div>
+    <div id="modal-skin" class="modal">
+        <div class="modal-content">
+            <h2>SKIN COMPOSER</h2>
+            <div class="skin-editor-container">
+                <div class="skin-sidebar">
+                    <div class="skin-canvas">
+                        <img id="sv-skin" src="">
+                        <img id="sv-eyebrows" src="">
+                        <img id="sv-eyes" src="">
+                        <img id="sv-head" src="">
+                    </div>
+                    <button class="btn secondary" onclick="app.randomizeSkin()">RANDOM</button>
+                    <button class="btn" onclick="app.saveSkin()">SAVE</button>
+                </div>
+                <div class="skin-main">
+                    <div class="skin-tabs" id="skin-tabs">
+                        <div class="skin-tab" onclick="app.setSkinCat('skin')">SKIN</div>
+                        <div class="skin-tab" onclick="app.setSkinCat('eyes')">EYES</div>
+                        <div class="skin-tab" onclick="app.setSkinCat('eyebrows')">BROWS</div>
+                        <div class="skin-tab" onclick="app.setSkinCat('head')">HAIR</div>
+                    </div>
+                    <div id="skin-cat-label"
+                        style="font-size: 11px; color: var(--accent); font-weight: 800; text-transform: uppercase; margin-top: 8px;">
+                    </div>
+                    <div class="skin-palette" id="skin-palette"></div>
+                    <div class="skin-grid" id="skin-grid"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        const app = {
+            brokerUrl: 'wss://public:public@public.cloud.shiftr.io',
+            topicBase: 'bloxd/official/tiers_v8/player/',
+            icons: {
+                sfc: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><g><path fill="none" d="M0 0h24v24H0z"></path><path fill-rule="nonzero" d="M7.05 13.406l3.534 3.536-1.413 1.414 1.415 1.415-1.414 1.414-2.475-2.475-2.829 2.829-1.414-1.414 2.829-2.83-2.475-2.474 1.414-1.414 1.414 1.413 1.413-1.414zM3 3l3.546.003 11.817 11.818 1.415-1.414 1.414 1.414-2.474 2.475 2.828 2.829-1.414 1.414-2.829-2.829-2.475 2.475-1.414-1.414 1.414-1.415L3.003 6.531 3 3zm14.457 0L21 3.003l.002 3.523-4.053 4.052-3.536-3.535L17.457 3z"></path></g></svg>`,
+                ugd: `<svg viewBox="0 0 24 24" shape-rendering="crispEdges"><path d="M5 20h4v-9H5z M11 20h4V5h-4z M17 20h4v-7h-4z"/></svg>`,
+                edit: `<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>`,
+                trash: `<svg viewBox="0 0 24 24"><path d="M9 3v1H4v2h1v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6h1V4h-5V3H9m0 5h2v9H9V8m4 0h2v9h-2V8z"/></svg>`
+            },
+            tierOrderList: ["LT1", "HT2", "LT2", "HT3", "LT3", "HT4", "LT4", "HT5", "LT5"],
+            subTiers: ["High", "Mid High", "Mid", "Mid Low", "Low"],
+            tierWeights: {
+                "LT1": 1000, "HT2": 900, "LT2": 800, "HT3": 700,
+                "LT3": 600, "HT4": 500, "LT4": 400, "HT5": 300,
+                "LT5": 200, "Unranked": 0
+            },
+            subTierWeights: {
+                "High": 50, "Mid High": 40, "Mid": 30, "Mid Low": 20, "Low": 10, "Unranked": 0
+            },
+            players: {},
+            myId: null,
+            client: null,
+            editingCat: '',
+            editingUserId: null,
+            isChangingName: false,
+            isAdmin: false,
+            ADMIN_HASH: "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918",
+            skinBase: "https://bloxd.io/textures/charSkins/pfp_components/",
+            skinConfig: {
+                skin: { styles: [0], colors: Array.from({ length: 24 }, (_, i) => i) },
+                eyes: { styles: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], colors: [0, 1, 2, 3, 4] },
+                eyebrows: { styles: [1, 2, 3], colors: [0, 1, 2, 3, 4] },
+                head: { styles: [1, 2, 3, 4, 5, 6, 7, 8, 9], colors: [0, 1, 2, 3, 4] }
+            },
+            // Custom Color Palettes from User Images
+            catColors: {
+                skin: [
+                    "#3b2b23", "#4e3b2e", "#644c3c", "#7b5d4a", "#926e58",
+                    "#a67e65", "#bc9175", "#d2a485", "#e6b795", "#f9caab",
+                    "#ffdec3", "#ffeedd", "#9b6045", "#b47558", "#cd8b6c",
+                    "#e6a180", "#ffb895", "#ffcfaa", "#ffe6c0", "#fff7d7",
+                    "#ffffff", "#000000", "#312c2a", "#544c4a"
+                ],
+                head: ["#1a1a1a", "#d4a15a", "#5a3a2a", "#c66528", "#e5c59e"],
+                eyebrows: ["#1a1a1a", "#d4a15a", "#5a3a2a", "#c66528", "#e5c59e"],
+                eyes: ["#1a1a1a", "#3b82f6", "#10b981", "#f59e0b", "#ffffff"]
+            },
+            activeSkinCat: 'skin',
+            mySkin: {
+                skin: { s: 0, c: 0 },
+                eyes: { s: 0, c: 0 },
+                eyebrows: { s: 1, c: 0 },
+                head: { s: 1, c: 0 }
+            },
+            init: function () {
+                this.buildTierButtons();
+                this.myId = localStorage.getItem('bx_uid_v8');
+                const myName = localStorage.getItem('bx_name_v8');
+                const savedSkin = localStorage.getItem('bx_skin_v8');
+                if (savedSkin) this.mySkin = JSON.parse(savedSkin);
 
-<script>
-    const BASE = "https://bloxd.io/textures/charSkins/pfp_components/";
-    
-    // 定義データ
-    const dataConfig = {
-        skin:     { styles: [0], colors: Array.from({length: 24}, (_, i) => i) },
-        eyes:     { styles: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], colors: [0, 1, 2, 3, 4] },
-        eyebrows: { styles: [1, 2, 3], colors: [0, 1, 2, 3, 4] },
-        head:     { styles: [1, 2, 3, 4, 5, 6, 7, 8, 9], colors: [0, 1, 2, 3, 4] }
-    };
+                this.connectMQTT();
+                if (!this.myId || !myName) {
+                    setTimeout(() => this.openNameModal(false), 500);
+                } else {
+                    this.players[this.myId] = {
+                        id: this.myId,
+                        name: myName,
+                        sfc: 'Unranked',
+                        ugd: 'Unranked',
+                        skin: this.mySkin
+                    };
+                    const savedTiers = localStorage.getItem('bx_tiers_v8');
+                    if (savedTiers) {
+                        const t = JSON.parse(savedTiers);
+                        this.players[this.myId].sfc = t.sfc || 'Unranked';
+                        this.players[this.myId].ugd = t.ugd || 'Unranked';
+                    }
+                    this.renderList();
+                }
+            },
+            hashString: async function (message) {
+                const msgBuffer = new TextEncoder().encode(message);
+                const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+                const hashArray = Array.from(new Uint8Array(hashBuffer));
+                return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            },
+            openAdminLogin: function () {
+                if (this.isAdmin) return;
+                document.getElementById('admin-error').innerText = '';
+                document.getElementById('admin-pwd').value = '';
+                document.getElementById('modal-admin').style.display = 'flex';
+            },
+            loginAdmin: async function () {
+                const pwd = document.getElementById('admin-pwd').value;
+                const hash = await this.hashString(pwd);
+                if (hash === this.ADMIN_HASH) {
+                    this.isAdmin = true;
+                    document.getElementById('modal-admin').style.display = 'none';
+                    document.getElementById('main-container').classList.add('admin-mode');
+                    document.getElementById('admin-badge').style.display = 'inline-block';
+                    this.renderList();
+                } else {
+                    document.getElementById('admin-error').innerText = 'Access Denied';
+                }
+            },
+            openNameModal: function (isChange) {
+                this.isChangingName = isChange;
+                document.getElementById('name-modal-title').innerText = isChange ? 'CHANGE NAME' : 'ENTER NAME';
+                document.getElementById('btn-submit-name').innerText = isChange ? 'UPDATE' : 'JOIN';
+                document.getElementById('username').value = isChange ? localStorage.getItem('bx_name_v8') : '';
+                document.getElementById('name-error').innerText = '';
+                document.getElementById('modal-name').style.display = 'flex';
+            },
+            submitName: function () {
+                const nameInput = document.getElementById('username').value.trim();
+                const errorDiv = document.getElementById('name-error');
+                const regex = /^[a-zA-Z0-9_]{3,20}$/;
+                if (!regex.test(nameInput)) {
+                    errorDiv.innerText = "Invalid format or too short.";
+                    return;
+                }
+                const lowerName = nameInput.toLowerCase();
+                for (const id in this.players) {
+                    if (id !== this.myId && this.players[id].name.toLowerCase() === lowerName) {
+                        errorDiv.innerText = "This name is already taken.";
+                        return;
+                    }
+                }
+                errorDiv.innerText = "";
+                if (!this.myId) {
+                    this.myId = 'u_' + Math.random().toString(36).substr(2, 9);
+                    localStorage.setItem('bx_uid_v8', this.myId);
+                    this.players[this.myId] = { id: this.myId, name: nameInput, sfc: 'Unranked', ugd: 'Unranked' };
+                } else {
+                    this.players[this.myId].name = nameInput;
+                }
+                localStorage.setItem('bx_name_v8', nameInput);
+                document.getElementById('modal-name').style.display = 'none';
 
-    let activeCat = 'skin';
-    let selections = {
-        skin: { s: 0, c: 0 },
-        eyes: { s: 0, c: 0 },
-        eyebrows: { s: 1, c: 0 },
-        head: { s: 1, c: 0 }
-    };
+                if (this.players[this.myId]) {
+                    this.players[this.myId].skin = this.mySkin;
+                }
 
-    // カラーボタンの背景色（推測）
-    const colorMap = {
-        0: '#1a1a1a', 1: '#5a3a2a', 2: '#3d2b1f', 3: '#c66528', 4: '#e5c59e',
-        5: '#7a4a2a', 6: '#d4a15a', 7: '#8a5a3a', 8: '#000000', 9: '#444444'
-    };
+                this.renderList();
+                this.publishData(this.myId);
+            },
+            deletePlayer: function (targetId) {
+                const isMe = (targetId === this.myId);
+                const msg = isMe ? "Are you sure you want to delete your profile?" : `Are you sure you want to delete ${this.players[targetId].name}?`;
+                if (confirm(msg)) {
+                    if (this.client && this.client.connected) {
+                        this.client.publish(this.topicBase + targetId, JSON.stringify({ deleted: true }), { retain: true }, () => {
+                            this.client.publish(this.topicBase + targetId, '', { retain: true });
+                        });
+                    }
+                    this.removePlayerLocally(targetId);
+                    if (isMe) {
+                        this.resetLocalSelf();
+                    }
+                }
+            },
+            removePlayerLocally: function (id) {
+                if (this.players[id]) {
+                    delete this.players[id];
+                    this.renderList();
+                }
+            },
+            closeModals: function () {
+                document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
+            },
+            resetLocalSelf: function () {
+                localStorage.removeItem('bx_uid_v8');
+                localStorage.removeItem('bx_name_v8');
+                localStorage.removeItem('bx_tiers_v8');
+                localStorage.removeItem('bx_skin_v8');
+                this.myId = null;
+                this.openNameModal(false);
+            },
+            // Skin Editor Logic
+            openSkinEditor: function () {
+                this.activeSkinCat = 'skin';
+                document.getElementById('modal-skin').style.display = 'flex';
+                this.setSkinCat('skin');
+                this.updateSkinPreview('v');
+            },
+            setSkinCat: function (cat) {
+                this.activeSkinCat = cat;
+                const tabs = document.getElementById('skin-tabs').children;
+                for (let t of tabs) {
+                    t.classList.toggle('active', t.innerText.toLowerCase().includes(cat.substring(0, 3)));
+                }
+                const label = document.getElementById('skin-cat-label');
+                if (label) label.innerText = `Select ${cat}`;
+                this.renderSkinGrid();
+            },
+            renderSkinPalette: function () { /* Palette Abolished */ },
+            renderSkinGrid: function () {
+                const grid = document.getElementById('skin-grid');
+                grid.innerHTML = '';
+                const conf = this.skinConfig[this.activeSkinCat];
+                const curS = this.mySkin[this.activeSkinCat].s;
+                const curC = this.mySkin[this.activeSkinCat].c;
 
-    function setCategory(cat) {
-        activeCat = cat;
-        document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.innerText.toLowerCase().includes(cat.substring(0,3))));
-        renderPalette();
-        renderGrid();
-    }
+                conf.styles.forEach(s => {
+                    conf.colors.forEach(c => {
+                        const id = `${s}_${c}`;
+                        const item = document.createElement('div');
+                        item.className = `skin-grid-item ${curS === s && curC === c ? 'active' : ''}`;
+                        const img = document.createElement('img');
+                        img.src = `${this.skinBase}pfp_${this.activeSkinCat}_${id}_preview.png`;
+                        img.style.position = "absolute";
+                        img.style.top = "0";
+                        img.style.left = "0";
+                        img.style.width = "100%";
+                        img.style.height = "auto";
+                        img.style.transform = "scale(1.2)";
+                        img.style.transformOrigin = "top center";
+                        img.style.imageRendering = "pixelated";
+                        img.onerror = () => item.style.display = 'none';
+                        item.appendChild(img);
+                        item.onclick = () => {
+                            this.mySkin[this.activeSkinCat].s = s;
+                            this.mySkin[this.activeSkinCat].c = c;
+                            // Sync Hair and Brows
+                            if (this.activeSkinCat === 'head') this.mySkin.eyebrows.c = c;
+                            if (this.activeSkinCat === 'eyebrows') this.mySkin.head.c = c;
 
-    function renderPalette() {
-        const list = document.getElementById('color-list');
-        list.innerHTML = '';
-        const colors = dataConfig[activeCat].colors;
+                            this.renderSkinGrid();
+                            this.updateSkinPreview('v');
+                        };
+                        grid.appendChild(item);
+                    });
+                });
+            },
+            updateSkinPreview: function (prefix) {
+                ['skin', 'eyes', 'eyebrows', 'head'].forEach(cat => {
+                    const sel = this.mySkin[cat];
+                    const id = `${sel.s}_${sel.c}`;
+                    const el = document.getElementById(`s${prefix}-${cat}`);
+                    if (el) el.src = `${this.skinBase}pfp_${cat}_${id}_preview.png`;
+                });
+            },
+            randomizeSkin: function () {
+                for (let cat in this.skinConfig) {
+                    const conf = this.skinConfig[cat];
+                    this.mySkin[cat].s = conf.styles[Math.floor(Math.random() * conf.styles.length)];
+                    const palette = this.catColors[cat] || [];
+                    this.mySkin[cat].c = Math.floor(Math.random() * Math.min(conf.colors.length, palette.length));
+                }
+                // Sync Hair and Brows
+                this.mySkin.eyebrows.c = this.mySkin.head.c;
 
-        colors.forEach(c => {
-            const btn = document.createElement('div');
-            btn.className = `color-btn ${selections[activeCat].c === c ? 'active' : ''}`;
-            btn.style.backgroundColor = colorMap[c] || `hsl(${c * 40}, 50%, 40%)`;
-            btn.innerText = c;
-            btn.onclick = () => {
-                selections[activeCat].c = c;
-                renderPalette();
-                renderGrid(); // 色を変えたらスタイルのプレビューも更新
-                updatePreview();
-            };
-            list.appendChild(btn);
+                this.updateSkinPreview('v');
+                this.renderSkinPalette();
+                this.renderSkinGrid();
+            },
+            saveSkin: function () {
+                localStorage.setItem('bx_skin_v8', JSON.stringify(this.mySkin));
+                if (this.myId && this.players[this.myId]) {
+                    this.players[this.myId].skin = this.mySkin;
+                    this.publishData(this.myId);
+                }
+                this.renderList();
+                this.closeModals();
+            },
+            getSkinHtml: function (skin) {
+                if (!skin) return '';
+                return `
+                    <div class="mini-skin">
+                        <img src="${this.skinBase}pfp_skin_${skin.skin.s}_${skin.skin.c}_preview.png">
+                        <img src="${this.skinBase}pfp_eyebrows_${skin.eyebrows.s}_${skin.eyebrows.c}_preview.png">
+                        <img src="${this.skinBase}pfp_eyes_${skin.eyes.s}_${skin.eyes.c}_preview.png">
+                        <img src="${this.skinBase}pfp_head_${skin.head.s}_${skin.head.c}_preview.png">
+                    </div>
+                `;
+            },
+            getTierBelowWeight: function (tierStr) {
+                if (tierStr === 'Unranked') return 0;
+                const baseTier = tierStr.split(' ')[0];
+                const idx = this.tierOrderList.indexOf(baseTier);
+                if (idx !== -1 && idx < this.tierOrderList.length - 1) {
+                    const belowTier = this.tierOrderList[idx + 1];
+                    return this.tierWeights[belowTier] || 0;
+                }
+                return 0;
+            },
+            getPlayerScore: function (p) {
+                let sfcScore = this.calculateScore(p.sfc);
+                let ugdScore = this.calculateScore(p.ugd);
+                if (p.sfc !== 'Unranked' && p.ugd === 'Unranked') {
+                    ugdScore = this.getTierBelowWeight(p.sfc);
+                } else if (p.ugd !== 'Unranked' && p.sfc === 'Unranked') {
+                    sfcScore = this.getTierBelowWeight(p.ugd);
+                }
+                return sfcScore + ugdScore;
+            },
+            calculateScore: function (tierStr) {
+                if (tierStr === 'Unranked') return 0;
+                let parts = tierStr.split(' ');
+                let t = parts[0];
+                let sub = parts.slice(1).join(' ');
+                return (this.tierWeights[t] || 0) + (this.subTierWeights[sub] || 0);
+            },
+            renderList: function () {
+                const list = document.getElementById('list');
+                list.innerHTML = '';
+                const arr = Object.values(this.players);
+                arr.sort((a, b) => {
+                    let scoreA = this.getPlayerScore(a);
+                    let scoreB = this.getPlayerScore(b);
+                    if (scoreB !== scoreA) {
+                        return scoreB - scoreA;
+                    }
+                    return a.name.localeCompare(b.name);
+                });
+                for (let i = 0; i < arr.length; i++) {
+                    const p = arr[i];
+                    const isMe = (p.id === this.myId);
+                    const sfcClass = 't-' + p.sfc.substring(0, 2);
+                    const ugdClass = 't-' + p.ugd.substring(0, 2);
+                    const canEdit = isMe || this.isAdmin;
+
+                    const row = document.createElement('div');
+                    row.className = `row ${isMe ? 'is-me' : ''}`;
+                    row.innerHTML = `
+                        <div class="rank-cell">#${i + 1}</div>
+                        <div class="name-wrapper" style="gap: 12px; justify-content: flex-start;">
+                            ${this.getSkinHtml(p.skin)}
+                            <span class="name" style="margin-right: auto;">${p.name}</span>
+                            ${isMe ? '<span class="you-badge">YOU</span>' : ''}
+                            ${(isMe || this.isAdmin) ? `<button class="action-btn del" onclick="app.deletePlayer('${p.id}')" title="Delete Profile">${this.icons.trash}</button>` : ''}
+                            ${isMe ? `<button class="action-btn" onclick="app.openNameModal(true)" title="Change Name">${this.icons.edit}</button>` : ''}
+                        </div>
+                        <div class="tier-cell">
+                            <div class="icon" ${canEdit ? `onclick="app.openEdit('sfc', '${p.id}')"` : ''}>${this.icons.sfc}</div>
+                            <div class="tier-text ${sfcClass}">${p.sfc.replace(' ', '<br>')}</div>
+                        </div>
+                        <div class="tier-cell">
+                            <div class="icon" ${canEdit ? `onclick="app.openEdit('ugd', '${p.id}')"` : ''}>${this.icons.ugd}</div>
+                            <div class="tier-text ${ugdClass}">${p.ugd.replace(' ', '<br>')}</div>
+                        </div>
+                    `;
+                    list.appendChild(row);
+
+                    // Trigger entrance animation with slight delay
+                    setTimeout(() => {
+                        row.classList.add('show');
+                    }, i * 50);
+                }
+            },
+            buildTierButtons: function () {
+                const div = document.getElementById('tier-btns');
+                const unBtn = document.createElement('button');
+                unBtn.className = 't-btn full-width';
+                unBtn.innerText = 'Unranked';
+                unBtn.onclick = function () { app.setTier('Unranked'); };
+                div.appendChild(unBtn);
+                for (let i = 0; i < this.tierOrderList.length; i++) {
+                    for (let j = 0; j < this.subTiers.length; j++) {
+                        const tierStr = this.tierOrderList[i] + ' ' + this.subTiers[j];
+                        const btn = document.createElement('button');
+                        btn.className = 't-btn';
+                        btn.innerText = tierStr;
+                        btn.onclick = function () { app.setTier(tierStr); };
+                        div.appendChild(btn);
+                    }
+                }
+            },
+            openEdit: function (cat, targetId) {
+                this.editingCat = cat;
+                this.editingUserId = targetId;
+                const targetName = this.players[targetId].name;
+                document.getElementById('edit-title').innerText = (cat === 'sfc' ? 'SURFACE TIER' : 'UNDERG TIER');
+                document.getElementById('edit-target-name').innerText = `Editing for: ${targetName}`;
+                document.getElementById('modal-edit').style.display = 'flex';
+            },
+            setTier: function (tierStr) {
+                const targetId = this.editingUserId;
+                this.players[targetId][this.editingCat] = tierStr;
+                if (targetId === this.myId) {
+                    localStorage.setItem('bx_tiers_v8', JSON.stringify({
+                        sfc: this.players[this.myId].sfc,
+                        ugd: this.players[this.myId].ugd
+                    }));
+                }
+                this.renderList();
+                document.getElementById('modal-edit').style.display = 'none';
+                this.publishData(targetId);
+            },
+            connectMQTT: function () {
+                const options = { clientId: 'bx_' + Math.random().toString(16).substr(2, 8) };
+                this.client = mqtt.connect(this.brokerUrl, options);
+                this.client.on('connect', () => {
+                    this.client.subscribe(this.topicBase + '+');
+                    if (this.myId && this.players[this.myId]) {
+                        this.publishData(this.myId);
+                    }
+                });
+                this.client.on('message', (topic, message) => {
+                    try {
+                        const parts = topic.split('/');
+                        const playerId = parts[parts.length - 1];
+                        const msgStr = message.toString();
+                        if (!msgStr) {
+                            this.removePlayerLocally(playerId);
+                            return;
+                        }
+                        const data = JSON.parse(msgStr);
+                        if (data.deleted) {
+                            this.removePlayerLocally(playerId);
+                            if (playerId === this.myId) {
+                                alert("Your profile was removed by Admin.");
+                                this.resetLocalSelf();
+                            }
+                            return;
+                        }
+                        const p = data.p; // Renamed remotePlayer to p for consistency with diff
+                        if (p && p.id) {
+                            if (p.id === this.myId) {
+                                localStorage.setItem('bx_tiers_v8', JSON.stringify({
+                                    sfc: p.sfc, ugd: p.ugd
+                                }));
+                            }
+                            // Update existing player or add new one
+                            if (!this.players[p.id]) {
+                                this.players[p.id] = p;
+                            } else {
+                                this.players[p.id].name = p.name;
+                                this.players[p.id].sfc = p.sfc;
+                                this.players[p.id].ugd = p.ugd;
+                                if (p.skin) this.players[p.id].skin = p.skin;
+                            }
+                            this.renderList();
+                        }
+                    } catch (err) { }
+                });
+            },
+            publishData: function (playerId) {
+                if (this.client && this.client.connected && this.players[playerId]) {
+                    const player = this.players[playerId];
+                    const payload = JSON.stringify({
+                        p: {
+                            id: player.id,
+                            name: player.name,
+                            sfc: player.sfc,
+                            ugd: player.ugd,
+                            skin: player.skin
+                        }
+                    });
+                    this.client.publish(this.topicBase + playerId, payload, { retain: true });
+                }
+            }
+        };
+        window.onclick = function (e) {
+            if (e.target.classList.contains('modal')) {
+                e.target.style.display = 'none';
+            }
+        };
+        document.getElementById('username').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') app.submitName();
         });
-    }
-
-    function renderGrid() {
-        const grid = document.getElementById('main-grid');
-        grid.innerHTML = '';
-        const styles = dataConfig[activeCat].styles;
-        const curC = selections[activeCat].c;
-
-        styles.forEach(s => {
-            const id = `${s}_${curC}`;
-            const item = document.createElement('div');
-            item.className = `grid-item ${selections[activeCat].s === s ? 'active' : ''}`;
-            
-            const img = document.createElement('img');
-            img.src = `${BASE}pfp_${activeCat}_${id}_preview.png`;
-            img.loading = "lazy";
-            img.onerror = () => item.style.display = 'none';
-
-            const badge = document.createElement('div');
-            badge.className = 'id-badge';
-            badge.innerText = `Type: ${s}`;
-
-            item.appendChild(img);
-            item.appendChild(badge);
-            item.onclick = () => {
-                selections[activeCat].s = s;
-                renderGrid();
-                updatePreview();
-            };
-            grid.appendChild(item);
+        document.getElementById('admin-pwd').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') app.loginAdmin();
         });
-    }
-
-    function updatePreview() {
-        ['skin', 'eyes', 'eyebrows', 'head'].forEach(cat => {
-            const sel = selections[cat];
-            const id = `${sel.s}_${sel.c}`;
-            document.getElementById(`v-${cat}`).src = `${BASE}pfp_${cat}_${id}_preview.png`;
-            document.getElementById(`log-${cat}`).innerText = id;
-        });
-    }
-
-    function randomize() {
-        for (const cat in dataConfig) {
-            const conf = dataConfig[cat];
-            selections[cat].s = conf.styles[Math.floor(Math.random() * conf.styles.length)];
-            selections[cat].c = conf.colors[Math.floor(Math.random() * conf.colors.length)];
-        }
-        updatePreview();
-        renderGrid();
-        renderPalette();
-    }
-
-    // 初期化
-    setCategory('skin');
-    updatePreview();
-
-</script>
+        window.onload = function () {
+            app.init();
+        };
+    </script>
 </body>
+
 </html>
