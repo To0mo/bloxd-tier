@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -8,136 +9,519 @@
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <style>
         :root {
-            --bg: #090a0f;
-            --card: #12141c;
-            --border: #232736;
+            --bg: #040508;
+            --card: rgba(22, 26, 42, 0.7);
+            --border: rgba(255, 255, 255, 0.08);
             --text-main: #f8fafc;
-            --text-muted: #64748b;
+            --text-muted: #94a3b8;
             --accent: #3b82f6;
+            --accent-glow: rgba(59, 130, 246, 0.4);
             --danger: #ef4444;
-            --tier-ht: #f59e0b;
-            --tier-lt: #8b5cf6;
-            --admin-color: #10b981;
+            --tier-ht: #fbbf24;
+            --tier-lt: #a78bfa;
+            --admin-color: #34d399;
+            --glass-bg: rgba(15, 23, 42, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.1);
         }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
             background-color: var(--bg);
+            background-image: 
+                radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 0% 100%, rgba(139, 92, 246, 0.1) 0%, transparent 40%);
+            background-attachment: fixed;
             color: var(--text-main);
             padding: 20px 10px;
-            padding-bottom: 60px;
+            padding-bottom: 80px;
+            min-height: 100vh;
         }
-        .container { max-width: 800px; margin: 0 auto; position: relative; min-height: 90vh; }
+
+        .container {
+            max-width: 850px;
+            margin: 0 auto;
+            position: relative;
+        }
+
         .header {
-            display: flex; justify-content: space-between; align-items: center;
-            margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+            padding: 20px 0;
+            border-bottom: 1px solid var(--border);
+            animation: fadeInDown 0.8s cubic-bezier(0.16, 1, 0.3, 1);
         }
+
         .header-left {
-            display: flex; align-items: center; gap: 12px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
         }
+
         .header-logo {
-            height: 36px; width: 36px; border-radius: 8px; object-fit: cover;
+            height: 48px;
+            width: 48px;
+            border-radius: 12px;
+            object-fit: cover;
+            border: 2px solid var(--border);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            transition: transform 0.3s ease;
+        }
+
+        .header-logo:hover {
+            transform: scale(1.05) rotate(2deg);
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 900;
+            letter-spacing: -1.5px;
+            margin: 0;
+            background: linear-gradient(135deg, #fff 0%, #cbd5e1 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header h1 span.admin-badge {
+            font-size: 10px;
+            font-weight: 800;
+            background: var(--admin-color);
+            color: #064e3b;
+            padding: 2px 8px;
+            border-radius: 6px;
+            margin-left: 10px;
+            vertical-align: middle;
+            text-shadow: none;
+            -webkit-text-fill-color: initial;
+            display: none;
+        }
+
+        .live-sync {
+            display: flex;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 8px 12px;
+            border-radius: 20px;
             border: 1px solid var(--border);
         }
-        .header h1 { font-size: 24px; font-weight: 900; letter-spacing: -1px; margin: 0; display: flex; align-items: center;}
-        .header h1 span.admin-badge {
-            font-size: 10px; background: var(--admin-color); color: #fff;
-            padding: 2px 6px; border-radius: 4px; margin-left: 8px; display: none;
-        }
-        .live-sync { display: flex; align-items: center; }
+
         .dot {
-            width: 8px; height: 8px; border-radius: 50%;
-            background-color: #22c55e; box-shadow: 0 0 8px #22c55e;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #22c55e;
+            box-shadow: 0 0 10px #22c55e;
+            animation: pulse 2s infinite;
         }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
         .table-header {
-            display: grid; grid-template-columns: 40px 1fr 90px 90px;
-            padding: 0 16px 12px; font-size: 11px; font-weight: 700; color: var(--text-muted);
+            display: grid;
+            grid-template-columns: 50px 1fr 100px 100px;
+            padding: 0 20px 16px;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            text-transform: uppercase;
         }
-        .list { display: flex; flex-direction: column; gap: 8px; }
+
+        .list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
         .row {
-            display: grid; grid-template-columns: 40px 1fr 90px 90px; align-items: center;
-            background-color: var(--card); border: 1px solid var(--border);
-            border-radius: 12px; padding: 12px 16px; transition: border-color 0.2s;
+            display: grid;
+            grid-template-columns: 50px 1fr 100px 100px;
+            align-items: center;
+            background-color: var(--card);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 16px 20px;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            opacity: 0;
+            transform: translateY(20px);
         }
-        .row.is-me { border-color: var(--accent); background: #171b28; }
-        .admin-mode .row:not(.is-me):hover { border-color: var(--admin-color); }
-        .rank { font-weight: 700; color: var(--text-muted); font-size: 15px; }
-        .name-wrapper { display: flex; align-items: center; gap: 4px; overflow: hidden; }
-        .name { 
-            font-weight: 700; font-size: 16px; white-space: nowrap; 
-            overflow: hidden; text-overflow: ellipsis; margin-right: 4px;
+
+        .row.show {
+            opacity: 1;
+            transform: translateY(0);
         }
+
+        .row:hover {
+            transform: translateY(-4px) scale(1.01);
+            background-color: rgba(30, 41, 59, 0.6);
+            border-color: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(59, 130, 246, 0.1);
+        }
+
+        .row.is-me {
+            border-color: var(--accent);
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%);
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+
+        .admin-mode .row:not(.is-me):hover {
+            border-color: var(--admin-color);
+            box-shadow: 0 0 20px rgba(52, 211, 153, 0.2);
+        }
+
+        .rank {
+            font-weight: 800;
+            color: var(--text-muted);
+            font-size: 18px;
+            font-family: 'Inter', sans-serif;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .name-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            overflow: hidden;
+        }
+
+        .name {
+            font-weight: 800;
+            font-size: 17px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-right: 4px;
+            color: #fff;
+        }
+
         .action-btn {
-            background: none; border: none; fill: var(--text-muted); cursor: pointer;
-            padding: 4px; border-radius: 4px; display: none; align-items: center; justify-content: center;
+            background: none;
+            border: none;
+            fill: var(--text-muted);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            display: none;
+            align-items: center;
+            justify-content: center;
         }
-        .is-me .action-btn { display: flex; }
-        .admin-mode .action-btn.del { display: flex; }
-        .action-btn:hover { background: rgba(255, 255, 255, 0.1); fill: var(--text-main); }
-        .action-btn.del:hover { background: rgba(239, 68, 68, 0.2); fill: var(--danger); }
-        .action-btn svg { width: 14px; height: 14px; }
-        .tier-cell { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+
+        .is-me .action-btn {
+            display: flex;
+        }
+
+        .admin-mode .action-btn.del {
+            display: flex;
+        }
+
+        .action-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            fill: var(--text-main);
+        }
+
+        .action-btn.del:hover {
+            background: rgba(239, 68, 68, 0.2);
+            fill: var(--danger);
+        }
+
+        .action-btn svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        .tier-cell {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+        }
+
         .icon {
-            width: 40px; height: 40px; background: #1a1d27; border: 1px solid var(--border);
-            border-radius: 8px; display: flex; align-items: center; justify-content: center;
+            width: 44px;
+            height: 44px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
         }
-        .icon svg { width: 22px; height: 22px; fill: var(--text-muted); transition: fill 0.2s; }
-        .is-me .icon { cursor: pointer; border-color: #334155; }
-        .is-me .icon:hover { border-color: var(--accent); background: #1e293b; }
-        .is-me .icon:hover svg { fill: var(--text-main); }
-        .admin-mode .icon { cursor: pointer; border-color: #334155; }
-        .admin-mode .icon:hover { border-color: var(--admin-color); background: #13241e; }
-        .admin-mode .icon:hover svg { fill: var(--admin-color); }
-        .tier-text { font-size: 10px; font-weight: 900; text-align: center; line-height: 1.2; }
-        .t-HT { color: var(--tier-ht); }
-        .t-LT { color: var(--tier-lt); }
-        .t-Un { color: var(--text-muted); }
+
+        .icon svg {
+            width: 24px;
+            height: 24px;
+            fill: var(--text-muted);
+            transition: all 0.3s ease;
+        }
+
+        .is-me .icon {
+            cursor: pointer;
+            border-color: #334155;
+        }
+
+        .is-me .icon:hover {
+            border-color: var(--accent);
+            background: #1e293b;
+        }
+
+        .is-me .icon:hover svg {
+            fill: var(--text-main);
+        }
+
+        .admin-mode .icon {
+            cursor: pointer;
+            border-color: #334155;
+        }
+
+        .admin-mode .icon:hover {
+            border-color: var(--admin-color);
+            background: #13241e;
+        }
+
+        .admin-mode .icon:hover svg {
+            fill: var(--admin-color);
+        }
+
+        .tier-text {
+            font-size: 10px;
+            font-weight: 900;
+            text-align: center;
+            line-height: 1.2;
+        }
+
+        .t-HT {
+            color: var(--tier-ht);
+        }
+
+        .t-LT {
+            color: var(--tier-lt);
+        }
+
+        .t-Un {
+            color: var(--text-muted);
+        }
+
         .admin-footer {
-            position: absolute; bottom: -40px; left: 0; width: 100%; text-align: center;
+            position: absolute;
+            bottom: -40px;
+            left: 0;
+            width: 100%;
+            text-align: center;
         }
+
         .admin-link {
-            font-size: 10px; color: #334155; text-decoration: none; cursor: pointer; transition: color 0.2s;
+            font-size: 10px;
+            color: #334155;
+            text-decoration: none;
+            cursor: pointer;
+            transition: color 0.2s;
         }
-        .admin-link:hover { color: var(--text-muted); }
+
+        .admin-link:hover {
+            color: var(--text-muted);
+        }
+
         .modal {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center;
-            z-index: 1000; backdrop-filter: blur(8px);
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(8px);
         }
+
         .modal-content {
-            background: var(--card); width: 90%; max-width: 420px;
-            border: 1px solid var(--border); border-radius: 16px; padding: 24px; text-align: center;
+            background: var(--glass-bg);
+            backdrop-filter: blur(24px);
+            width: 90%;
+            max-width: 400px;
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 32px;
+            text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            animation: modalPop 0.4s cubic-bezier(0.16, 1, 0.3, 1);
         }
-        h2 { font-size: 20px; margin-bottom: 10px; font-weight: 900; }
-        p.desc { font-size: 12px; color: var(--text-muted); margin-bottom: 20px; }
+
+        @keyframes modalPop {
+            from { opacity: 0; transform: scale(0.9) translateY(20px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        h2 {
+            font-size: 24px;
+            margin-bottom: 12px;
+            font-weight: 900;
+            letter-spacing: -1px;
+        }
+
+        p.desc {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+
         input {
-            width: 100%; padding: 14px; background: var(--bg); border: 1px solid var(--border);
-            color: white; border-radius: 8px; font-size: 16px; margin-bottom: 10px; font-family: inherit; font-weight: 600;
+            width: 100%;
+            padding: 14px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: white;
+            border-radius: 8px;
+            font-size: 16px;
+            margin-bottom: 10px;
+            font-family: inherit;
+            font-weight: 600;
         }
-        .error-msg { color: var(--danger); font-size: 12px; margin-bottom: 15px; height: 14px; font-weight: 600;}
+
+        .error-msg {
+            color: var(--danger);
+            font-size: 12px;
+            margin-bottom: 15px;
+            height: 14px;
+            font-weight: 600;
+        }
+
         .btn {
-            width: 100%; padding: 14px; background: var(--accent); color: white;
-            border: none; border-radius: 8px; font-weight: 700; font-size: 15px; cursor: pointer;
+            width: 100%;
+            padding: 16px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-weight: 800;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px var(--accent-glow);
+            margin-bottom: 12px;
         }
-        .btn.admin-btn { background: var(--admin-color); }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px var(--accent-glow);
+            filter: brightness(1.1);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn.secondary {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-muted);
+            box-shadow: none;
+            border: 1px solid var(--border);
+        }
+
+        .btn.secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-main);
+            border-color: var(--text-muted);
+        }
+
+        .btn.admin-btn {
+            background: var(--admin-color);
+            box-shadow: 0 4px 12px rgba(52, 211, 153, 0.3);
+            color: #064e3b;
+        }
+
         .tier-grid {
-            display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-height: 50vh; overflow-y: auto;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            max-height: 50vh;
+            overflow-y: auto;
         }
+
         .t-btn {
-            background: #1a1d27; border: 1px solid var(--border); color: var(--text-main);
-            padding: 14px 10px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer;
+            background: #1a1d27;
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 14px 10px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 13px;
+            cursor: pointer;
         }
-        .t-btn:hover { border-color: var(--accent); color: var(--accent); background: #1e293b; }
-        .t-btn.full-width { grid-column: 1 / -1; background: #232736; border-color: #334155; color: var(--text-muted); }
-        .t-btn.full-width:hover { border-color: var(--text-main); color: var(--text-main); }
+
+        .t-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: #1e293b;
+        }
+
+        .t-btn.full-width {
+            grid-column: 1 / -1;
+            background: #232736;
+            border-color: #334155;
+            color: var(--text-muted);
+        }
+
+        .t-btn.full-width:hover {
+            border-color: var(--text-main);
+            color: var(--text-main);
+        }
+
         @media (max-width: 480px) {
-            .table-header, .row { grid-template-columns: 30px 1fr 75px 75px; padding: 10px; gap: 4px; }
-            .icon { width: 34px; height: 34px; }
-            .icon svg { width: 18px; height: 18px; }
-            .tier-grid { grid-template-columns: 1fr; }
+            .table-header,
+            .row {
+                grid-template-columns: 40px 1fr 80px 80px;
+                padding: 12px 14px;
+                gap: 8px;
+            }
+
+            .header h1 {
+                font-size: 22px;
+            }
+
+            .icon {
+                width: 38px;
+                height: 38px;
+            }
+
+            .icon svg {
+                width: 20px;
+                height: 20px;
+            }
+
+            .tier-grid {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
+
 <body>
     <div class="container" id="main-container">
         <header class="header">
@@ -170,7 +554,8 @@
             <p class="desc">Letters, numbers, and underscores (_) only. Min 3 chars.</p>
             <input type="text" id="username" placeholder="Your_Name" maxlength="15">
             <div id="name-error" class="error-msg"></div>
-            <button id="btn-submit-name" class="btn" onclick="app.submitName()">JOIN</button>
+            <button id="btn-submit-name" class="btn" onclick="app.submitName()">JOIN RANKINGS</button>
+            <button id="btn-guest" class="btn secondary" onclick="app.closeModals()">VIEW AS GUEST</button>
         </div>
     </div>
     <div id="modal-edit" class="modal">
@@ -191,7 +576,7 @@
     <script>
         const app = {
             brokerUrl: 'wss://public:public@public.cloud.shiftr.io',
-            topicBase: 'bloxd/official/tiers_v8/player/', 
+            topicBase: 'bloxd/official/tiers_v8/player/',
             icons: {
                 sfc: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><g><path fill="none" d="M0 0h24v24H0z"></path><path fill-rule="nonzero" d="M7.05 13.406l3.534 3.536-1.413 1.414 1.415 1.415-1.414 1.414-2.475-2.475-2.829 2.829-1.414-1.414 2.829-2.83-2.475-2.474 1.414-1.414 1.414 1.413 1.413-1.414zM3 3l3.546.003 11.817 11.818 1.415-1.414 1.414 1.414-2.474 2.475 2.828 2.829-1.414 1.414-2.829-2.829-2.475 2.475-1.414-1.414 1.414-1.415L3.003 6.531 3 3zm14.457 0L21 3.003l.002 3.523-4.053 4.052-3.536-3.535L17.457 3z"></path></g></svg>`,
                 ugd: `<svg viewBox="0 0 24 24" shape-rendering="crispEdges"><path d="M5 20h4v-9H5z M11 20h4V5h-4z M17 20h4v-7h-4z"/></svg>`,
@@ -201,8 +586,8 @@
             tierOrderList: ["LT1", "HT2", "LT2", "HT3", "LT3", "HT4", "LT4", "HT5", "LT5"],
             subTiers: ["High", "Mid High", "Mid", "Mid Low", "Low"],
             tierWeights: {
-                "LT1": 1000, "HT2": 900, "LT2": 800, "HT3": 700, 
-                "LT3": 600, "HT4": 500, "LT4": 400, "HT5": 300, 
+                "LT1": 1000, "HT2": 900, "LT2": 800, "HT3": 700,
+                "LT3": 600, "HT4": 500, "LT4": 400, "HT5": 300,
                 "LT5": 200, "Unranked": 0
             },
             subTierWeights: {
@@ -215,14 +600,14 @@
             editingUserId: null,
             isChangingName: false,
             isAdmin: false,
-            ADMIN_HASH: "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918", 
-            init: function() {
+            ADMIN_HASH: "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918",
+            init: function () {
                 this.buildTierButtons();
                 this.myId = localStorage.getItem('bx_uid_v8');
                 const myName = localStorage.getItem('bx_name_v8');
                 this.connectMQTT();
                 if (!this.myId || !myName) {
-                    this.openNameModal(false);
+                    setTimeout(() => this.openNameModal(false), 500);
                 } else {
                     this.players[this.myId] = { id: this.myId, name: myName, sfc: 'Unranked', ugd: 'Unranked' };
                     const savedTiers = localStorage.getItem('bx_tiers_v8');
@@ -234,19 +619,19 @@
                     this.renderList();
                 }
             },
-            hashString: async function(message) {
+            hashString: async function (message) {
                 const msgBuffer = new TextEncoder().encode(message);
                 const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
                 const hashArray = Array.from(new Uint8Array(hashBuffer));
                 return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
             },
-            openAdminLogin: function() {
-                if(this.isAdmin) return;
+            openAdminLogin: function () {
+                if (this.isAdmin) return;
                 document.getElementById('admin-error').innerText = '';
                 document.getElementById('admin-pwd').value = '';
                 document.getElementById('modal-admin').style.display = 'flex';
             },
-            loginAdmin: async function() {
+            loginAdmin: async function () {
                 const pwd = document.getElementById('admin-pwd').value;
                 const hash = await this.hashString(pwd);
                 if (hash === this.ADMIN_HASH) {
@@ -259,7 +644,7 @@
                     document.getElementById('admin-error').innerText = 'Access Denied';
                 }
             },
-            openNameModal: function(isChange) {
+            openNameModal: function (isChange) {
                 this.isChangingName = isChange;
                 document.getElementById('name-modal-title').innerText = isChange ? 'CHANGE NAME' : 'ENTER NAME';
                 document.getElementById('btn-submit-name').innerText = isChange ? 'UPDATE' : 'JOIN';
@@ -267,7 +652,7 @@
                 document.getElementById('name-error').innerText = '';
                 document.getElementById('modal-name').style.display = 'flex';
             },
-            submitName: function() {
+            submitName: function () {
                 const nameInput = document.getElementById('username').value.trim();
                 const errorDiv = document.getElementById('name-error');
                 const regex = /^[a-zA-Z0-9_]{3,15}$/;
@@ -295,7 +680,7 @@
                 this.renderList();
                 this.publishData(this.myId);
             },
-            deletePlayer: function(targetId) {
+            deletePlayer: function (targetId) {
                 const isMe = (targetId === this.myId);
                 const msg = isMe ? "Are you sure you want to delete your profile?" : `Are you sure you want to delete ${this.players[targetId].name}?`;
                 if (confirm(msg)) {
@@ -310,33 +695,56 @@
                     }
                 }
             },
-            removePlayerLocally: function(id) {
+            removePlayerLocally: function (id) {
                 if (this.players[id]) {
                     delete this.players[id];
                     this.renderList();
                 }
             },
-            resetLocalSelf: function() {
+            closeModals: function() {
+                document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
+            },
+            resetLocalSelf: function () {
                 localStorage.removeItem('bx_uid_v8');
                 localStorage.removeItem('bx_name_v8');
                 localStorage.removeItem('bx_tiers_v8');
                 this.myId = null;
                 this.openNameModal(false);
             },
-            calculateScore: function(tierStr) {
+            getTierBelowWeight: function (tierStr) {
+                if (tierStr === 'Unranked') return 0;
+                const baseTier = tierStr.split(' ')[0];
+                const idx = this.tierOrderList.indexOf(baseTier);
+                if (idx !== -1 && idx < this.tierOrderList.length - 1) {
+                    const belowTier = this.tierOrderList[idx + 1];
+                    return this.tierWeights[belowTier] || 0;
+                }
+                return 0;
+            },
+            getPlayerScore: function (p) {
+                let sfcScore = this.calculateScore(p.sfc);
+                let ugdScore = this.calculateScore(p.ugd);
+                if (p.sfc !== 'Unranked' && p.ugd === 'Unranked') {
+                    ugdScore = this.getTierBelowWeight(p.sfc);
+                } else if (p.ugd !== 'Unranked' && p.sfc === 'Unranked') {
+                    sfcScore = this.getTierBelowWeight(p.ugd);
+                }
+                return sfcScore + ugdScore;
+            },
+            calculateScore: function (tierStr) {
                 if (tierStr === 'Unranked') return 0;
                 let parts = tierStr.split(' ');
                 let t = parts[0];
                 let sub = parts.slice(1).join(' ');
                 return (this.tierWeights[t] || 0) + (this.subTierWeights[sub] || 0);
             },
-            renderList: function() {
+            renderList: function () {
                 const list = document.getElementById('list');
                 list.innerHTML = '';
                 const arr = Object.values(this.players);
                 arr.sort((a, b) => {
-                    let scoreA = this.calculateScore(a.sfc) + this.calculateScore(a.ugd);
-                    let scoreB = this.calculateScore(b.sfc) + this.calculateScore(b.ugd);
+                    let scoreA = this.getPlayerScore(a);
+                    let scoreB = this.getPlayerScore(b);
                     if (scoreB !== scoreA) {
                         return scoreB - scoreA;
                     }
@@ -348,32 +756,39 @@
                     const sfcClass = 't-' + p.sfc.substring(0, 2);
                     const ugdClass = 't-' + p.ugd.substring(0, 2);
                     const canEdit = isMe || this.isAdmin;
-                    list.innerHTML += `
-                        <div class="row ${isMe ? 'is-me' : ''}">
-                            <div class="rank">${i + 1}</div>
-                            <div class="name-wrapper">
-                                <div class="name">${p.name}</div>
-                                ${isMe ? `<button class="action-btn" onclick="app.openNameModal(true)" title="Change Name">${this.icons.edit}</button>` : ''}
-                                ${(isMe || this.isAdmin) ? `<button class="action-btn del" onclick="app.deletePlayer('${p.id}')" title="Delete Profile">${this.icons.trash}</button>` : ''}
-                            </div>
-                            <div class="tier-cell">
-                                <div class="icon" ${canEdit ? `onclick="app.openEdit('sfc', '${p.id}')"` : ''}>${this.icons.sfc}</div>
-                                <div class="tier-text ${sfcClass}">${p.sfc.replace(' ', '<br>')}</div>
-                            </div>
-                            <div class="tier-cell">
-                                <div class="icon" ${canEdit ? `onclick="app.openEdit('ugd', '${p.id}')"` : ''}>${this.icons.ugd}</div>
-                                <div class="tier-text ${ugdClass}">${p.ugd.replace(' ', '<br>')}</div>
-                            </div>
+                    
+                    const row = document.createElement('div');
+                    row.className = `row ${isMe ? 'is-me' : ''}`;
+                    row.innerHTML = `
+                        <div class="rank">${i + 1}</div>
+                        <div class="name-wrapper">
+                            <div class="name">${p.name}</div>
+                            ${isMe ? `<button class="action-btn" onclick="app.openNameModal(true)" title="Change Name">${this.icons.edit}</button>` : ''}
+                            ${(isMe || this.isAdmin) ? `<button class="action-btn del" onclick="app.deletePlayer('${p.id}')" title="Delete Profile">${this.icons.trash}</button>` : ''}
+                        </div>
+                        <div class="tier-cell">
+                            <div class="icon" ${canEdit ? `onclick="app.openEdit('sfc', '${p.id}')"` : ''}>${this.icons.sfc}</div>
+                            <div class="tier-text ${sfcClass}">${p.sfc.replace(' ', '<br>')}</div>
+                        </div>
+                        <div class="tier-cell">
+                            <div class="icon" ${canEdit ? `onclick="app.openEdit('ugd', '${p.id}')"` : ''}>${this.icons.ugd}</div>
+                            <div class="tier-text ${ugdClass}">${p.ugd.replace(' ', '<br>')}</div>
                         </div>
                     `;
+                    list.appendChild(row);
+                    
+                    // Trigger entrance animation with slight delay
+                    setTimeout(() => {
+                        row.classList.add('show');
+                    }, i * 50);
                 }
             },
-            buildTierButtons: function() {
+            buildTierButtons: function () {
                 const div = document.getElementById('tier-btns');
                 const unBtn = document.createElement('button');
                 unBtn.className = 't-btn full-width';
                 unBtn.innerText = 'Unranked';
-                unBtn.onclick = function() { app.setTier('Unranked'); };
+                unBtn.onclick = function () { app.setTier('Unranked'); };
                 div.appendChild(unBtn);
                 for (let i = 0; i < this.tierOrderList.length; i++) {
                     for (let j = 0; j < this.subTiers.length; j++) {
@@ -381,12 +796,12 @@
                         const btn = document.createElement('button');
                         btn.className = 't-btn';
                         btn.innerText = tierStr;
-                        btn.onclick = function() { app.setTier(tierStr); };
+                        btn.onclick = function () { app.setTier(tierStr); };
                         div.appendChild(btn);
                     }
                 }
             },
-            openEdit: function(cat, targetId) {
+            openEdit: function (cat, targetId) {
                 this.editingCat = cat;
                 this.editingUserId = targetId;
                 const targetName = this.players[targetId].name;
@@ -394,7 +809,7 @@
                 document.getElementById('edit-target-name').innerText = `Editing for: ${targetName}`;
                 document.getElementById('modal-edit').style.display = 'flex';
             },
-            setTier: function(tierStr) {
+            setTier: function (tierStr) {
                 const targetId = this.editingUserId;
                 this.players[targetId][this.editingCat] = tierStr;
                 if (targetId === this.myId) {
@@ -407,7 +822,7 @@
                 document.getElementById('modal-edit').style.display = 'none';
                 this.publishData(targetId);
             },
-            connectMQTT: function() {
+            connectMQTT: function () {
                 const options = { clientId: 'bx_' + Math.random().toString(16).substr(2, 8) };
                 this.client = mqtt.connect(this.brokerUrl, options);
                 this.client.on('connect', () => {
@@ -444,18 +859,18 @@
                             this.players[remotePlayer.id] = remotePlayer;
                             this.renderList();
                         }
-                    } catch (err) {}
+                    } catch (err) { }
                 });
             },
-            publishData: function(playerId) {
+            publishData: function (playerId) {
                 if (this.client && this.client.connected && this.players[playerId]) {
                     const payload = JSON.stringify({ p: this.players[playerId] });
                     this.client.publish(this.topicBase + playerId, payload, { retain: true });
                 }
             }
         };
-        window.onclick = function(e) {
-            if (e.target.classList.contains('modal') && e.target.id !== 'modal-name') {
+        window.onclick = function (e) {
+            if (e.target.classList.contains('modal')) {
                 e.target.style.display = 'none';
             }
         };
@@ -465,9 +880,10 @@
         document.getElementById('admin-pwd').addEventListener('keypress', function (e) {
             if (e.key === 'Enter') app.loginAdmin();
         });
-        window.onload = function() {
+        window.onload = function () {
             app.init();
         };
     </script>
 </body>
+
 </html>
