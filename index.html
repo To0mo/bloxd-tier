@@ -9,19 +9,19 @@
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <style>
         :root {
-            --bg: #040508;
-            --card: rgba(22, 26, 42, 0.7);
-            --border: rgba(255, 255, 255, 0.08);
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
+            --bg: #020305;
+            --card: rgba(13, 16, 26, 0.5);
+            --border: rgba(255, 255, 255, 0.04);
+            --text-main: #f1f5f9;
+            --text-muted: #64748b;
             --accent: #3b82f6;
-            --accent-glow: rgba(59, 130, 246, 0.4);
+            --accent-glow: rgba(59, 130, 246, 0.2);
             --danger: #ef4444;
-            --tier-ht: #fbbf24;
-            --tier-lt: #a78bfa;
-            --admin-color: #34d399;
-            --glass-bg: rgba(15, 23, 42, 0.7);
-            --glass-border: rgba(255, 255, 255, 0.1);
+            --tier-ht: #f59e0b;
+            --tier-lt: #8b5cf6;
+            --admin-color: #10b981;
+            --glass-bg: rgba(7, 10, 15, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.06);
         }
 
         * {
@@ -34,9 +34,14 @@
             font-family: 'Inter', system-ui, -apple-system, sans-serif;
             background-color: var(--bg);
             background-image: 
-                radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
-                radial-gradient(circle at 0% 100%, rgba(139, 92, 246, 0.1) 0%, transparent 40%);
+                linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)),
+                url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAIUlEQVR4nGOQUtX5r23pjBMzUEcBPsyArgPdRCooIOQGAAigZFnRRKyWAAAAAElFTkSuQmCC"),
+                radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 0% 100%, rgba(139, 92, 246, 0.05) 0%, transparent 40%);
+            background-repeat: no-repeat, repeat, no-repeat, no-repeat;
+            background-size: cover, 100px 100px, auto, auto;
             background-attachment: fixed;
+            image-rendering: pixelated;
             color: var(--text-main);
             padding: 20px 10px;
             padding-bottom: 80px;
@@ -552,7 +557,7 @@
         <div class="modal-content">
             <h2 id="name-modal-title">ENTER NAME</h2>
             <p class="desc">Letters, numbers, and underscores (_) only. Min 3 chars.</p>
-            <input type="text" id="username" placeholder="Your_Name" maxlength="15">
+            <input type="text" id="username" placeholder="Your_Name" maxlength="20">
             <div id="name-error" class="error-msg"></div>
             <button id="btn-submit-name" class="btn" onclick="app.submitName()">JOIN RANKINGS</button>
             <button id="btn-guest" class="btn secondary" onclick="app.closeModals()">VIEW AS GUEST</button>
@@ -655,7 +660,7 @@
             submitName: function () {
                 const nameInput = document.getElementById('username').value.trim();
                 const errorDiv = document.getElementById('name-error');
-                const regex = /^[a-zA-Z0-9_]{3,15}$/;
+                const regex = /^[a-zA-Z0-9_]{3,20}$/;
                 if (!regex.test(nameInput)) {
                     errorDiv.innerText = "Invalid format or too short.";
                     return;
